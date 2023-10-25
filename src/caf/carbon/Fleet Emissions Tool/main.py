@@ -19,8 +19,8 @@ else:
 config.read("config_local.txt")
 outpath = "CAFCarb/outputs/"
 # %% Scenario Agnostic
-index_fleet = ScenarioInvariant.IndexFleet(config, run_type, outpath, run_fresh=True)
-invariant_data = ScenarioInvariant.Invariant(index_fleet, config, run_type, time_period)
+index_fleet = scenario_invariant.IndexFleet(config, run_type, outpath, run_fresh=True)
+invariant_data = scenario_invariant.Invariant(index_fleet, config, run_type, time_period)
 
 if run_type == "MSOA":
     # State whether you want to generate baseline projections or decarbonisation
@@ -34,8 +34,8 @@ if run_type == "MSOA":
             print("\n\n\n###################")
             print(i, time)
             print("###################")
-            scenario = ScenarioDependent.Scenario(config, run_type, time_period, time, i, invariant_data, pathway)
-            model = Projection.Model(config, time, time_period, invariant_data, scenario, outpath)
+            scenario = scenario_dependent.Scenario(config, run_type, time_period, time, i, invariant_data, pathway)
+            model = projection.Model(config, time, time_period, invariant_data, scenario, outpath)
             model.allocate_chainage()
             model.predict_emissions()
             model.save_output()
@@ -44,7 +44,7 @@ if run_type == "MSOA":
     if not time_period:
         generate_outputs = True
         if generate_outputs:
-            summary_outputs = OutputFigures.SummaryOutputs(config,
+            summary_outputs = output_figures.SummaryOutputs(config,
                                                            time_period_list,
                                                            outpath,
                                                            pathway,
@@ -55,4 +55,4 @@ if run_type == "MSOA":
 
         normalise_outputs = False
         if normalise_outputs:
-            postgres_outputs = PostgresNormalisation.NormaliseOutputs(summary_outputs, outpath)
+            postgres_outputs = postgres_normalisation.NormaliseOutputs(summary_outputs, outpath)
