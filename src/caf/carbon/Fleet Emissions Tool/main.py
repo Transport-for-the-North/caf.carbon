@@ -10,6 +10,7 @@ run_type = "MSOA"  # Options currently limited only to "MSOA"
 
 # Specify if NoHAM demand inputs are separated into AM, IP, PM time periods
 time_period = False
+ev_redistribution = True
 
 if time_period:
     time_period_list = ["AM", "IP", "PM"]
@@ -19,7 +20,7 @@ else:
 config.read("config_local.txt")
 outpath = "CAFCarb/outputs/"
 # %% Scenario Agnostic
-index_fleet = scenario_invariant.IndexFleet(config, run_type, outpath, run_fresh=True)
+index_fleet = scenario_invariant.IndexFleet(config, run_type, outpath, run_fresh=False)
 invariant_data = scenario_invariant.Invariant(index_fleet, config, run_type, time_period)
 
 if run_type == "MSOA":
@@ -35,7 +36,7 @@ if run_type == "MSOA":
             print(i, time)
             print("###################")
             scenario = scenario_dependent.Scenario(config, run_type, time_period, time, i, invariant_data, pathway)
-            model = projection.Model(config, time, time_period, invariant_data, scenario, outpath)
+            model = projection.Model(config, time, time_period, invariant_data, scenario, ev_redistribution, outpath)
             model.allocate_chainage()
             model.predict_emissions()
             model.save_output()
