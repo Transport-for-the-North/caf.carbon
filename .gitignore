@@ -9,6 +9,7 @@ __pycache__/
 # Data
 *.csv
 *.xlsx
+*.pbz2
 
 # Distribution / packaging
 .Python
