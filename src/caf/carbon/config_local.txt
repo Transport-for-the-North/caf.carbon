@@ -51,7 +51,7 @@ nohamAreaTypeFile: noham_area_types.csv
 travellerTypes: tfn_traveller_type.csv
 
 inputLocation: CAFCarb/input/
-scenarioFile: scenario_tables_DfT_CAS.xlsx
+scenarioFile: scenario_tables_no_EV.xlsx
 scenarioPathway: scenario_tables_pathway.xlsx
 generalFile: general_tables.xlsx
 populationFile: export_zonal_population.xlsx

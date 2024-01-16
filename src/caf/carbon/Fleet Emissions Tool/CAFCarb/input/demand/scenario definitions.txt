@@ -1,2 +1,0 @@
-SC01 - BAU Core
-SC02 - AEV Core
