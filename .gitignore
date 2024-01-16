@@ -136,6 +136,6 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-src/caf/2018/
-src/caf/CAFCarb/
-src/caf/functional analysis/
+src/caf/carbon/2018/
+src/caf/carbon/CAFCarb/
+src/caf/carbon/functional analysis/
