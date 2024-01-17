@@ -1,10 +1,12 @@
+# Built-Ins
 from datetime import datetime
 
-import pandas as pd
+# Third Party
 import numpy as np
-
-from lib import utility as ut
+import pandas as pd
 from lib import fleet_redistribution
+from lib import utility as ut
+
 
 class Model:
     """Predict emissions using emissions, demand and projected fleet data."""

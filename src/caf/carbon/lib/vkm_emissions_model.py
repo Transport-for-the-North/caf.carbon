@@ -1,6 +1,9 @@
-import pandas as pd
+# Built-Ins
 import dataclasses
 import os
+
+# Third Party
+import pandas as pd
 
 
 @dataclasses.dataclass

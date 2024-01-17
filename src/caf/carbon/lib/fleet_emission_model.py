@@ -1,7 +1,16 @@
+# Built-Ins
 import configparser as cf
-import pandas as pd
 import logging
-from lib import scenario_invariant, scenario_dependent, projection, output_figures, postgres_normalisation
+
+# Third Party
+import pandas as pd
+from lib import (
+    output_figures,
+    postgres_normalisation,
+    projection,
+    scenario_dependent,
+    scenario_invariant,
+)
 from lib.load_data import REGION_FILTER
 
 

@@ -1,5 +1,9 @@
-import pandas as pd
+# Built-Ins
 from datetime import datetime
+
+# Third Party
+import pandas as pd
+
 
 class Redistribution:
     """Redistribute the vehicle fleet, using a determined relation from socioeconomic factors."""

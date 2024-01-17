@@ -1,6 +1,11 @@
+# Built-Ins
 import logging
-from src.caf.carbon.lib import fleet_emission_model, vkm_emissions_model
+
+# Third Party
 from caf.toolkit.log_helpers import LogHelper, ToolDetails
+
+# Local Imports
+from src.caf.carbon.lib import fleet_emission_model, vkm_emissions_model
 
 
 def main():

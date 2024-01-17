@@ -1,11 +1,12 @@
-from datetime import datetime
+# Built-Ins
 import os
-import matplotlib.pyplot as plt
 import re
+from datetime import datetime
 
-import pandas as pd
+# Third Party
+import matplotlib.pyplot as plt
 import numpy as np
-
+import pandas as pd
 from lib import utility as ut
 
 
