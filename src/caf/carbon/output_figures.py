@@ -2,25 +2,23 @@ from datetime import datetime
 import os
 import matplotlib.pyplot as plt
 import re
-
+import configparser as cf
 import pandas as pd
 import numpy as np
 
-from lib import utility as ut
+from src.caf.carbon import utility as ut
+
+from load_data import OUT_PATH, NOHAM_AREA_TYPE, NOHAM_TO_MSOA, TARGET_AREA_TYPE
 
 
 class SummaryOutputs:
     """Combine scenario outputs and transform into summary outputs."""
 
-    def __init__(self, config, time_period_list, outpath, pathway, invariant_obj, scenario_obj):
+    def __init__(self, time_period_list, pathway, invariant_obj, scenario_obj):
         """
         
         Parameters
         ----------
-        config : configparser
-            Filepath lookup to import tables.
-        outpath : str
-            Filepath to export tables.
         pathway : str
             Determines whether outputs relate to 'pathway' or standard 
             scenario inputs (used for filenames).
@@ -29,17 +27,15 @@ class SummaryOutputs:
         scenario_obj : class obj
             Includes scenario tables for the most scenario run through NoCarb.
         """
-        self.configuration = config
         self.time_period_list = time_period_list
-        self.outpath = outpath
+        self.outpath = OUT_PATH
         self.invariant = invariant_obj
         self.last_scenario = scenario_obj
         self.date = datetime.today().strftime('%Y_%m_%d')
         self.run_type = invariant_obj.run_type.lower()
 
-        if self.run_type == "msoa":
-            local_drive_date = os.listdir("CAFCarb/outputs")[-1][-14:-4]
-            self.date = local_drive_date
+        local_drive_date = os.listdir("CAFCarb/outputs")[-1][-14:-4]
+        self.date = local_drive_date
 
         if pathway == "none":
             self.pathway = ""
@@ -56,33 +52,32 @@ class SummaryOutputs:
         2. A 2050 fuel share table.
         """
 
-        if self.run_type == "msoa":
-            # Convert the noham area information into msoa zones
-            area_info = pd.read_csv(self.configuration["filePaths"]["nohamAreaTypeFile"]).rename(columns={'zone': 'nohamZoneID'})
-            msoa_zones = pd.read_csv(self.configuration["filePaths"]["msoaNoHAMFile"])
-            area_zones = pd.read_csv(self.configuration["filePaths"]["newAreaTypes"]).rename(columns={'msoa_area_code': 'msoa11cd'})
+        # Convert the noham area information into msoa zones
+        area_info = pd.read_csv(NOHAM_AREA_TYPE).rename(columns={'zone': 'nohamZoneID'})
+        msoa_zones = pd.read_csv(NOHAM_TO_MSOA)
+        area_zones = pd.read_csv(TARGET_AREA_TYPE).rename(columns={'msoa_area_code': 'msoa11cd'})
 
-            msoa_convert = msoa_zones[['nohamZoneID', 'msoa11cd', 'overlap_noham_split_factor']].merge(area_info,
-                                                                                                       on='nohamZoneID',
-                                                                                                       how='left')
-            msoa_convert['population'] = msoa_convert['population'] * msoa_convert['overlap_noham_split_factor']
-            msoa_convert = msoa_convert.sort_values(by=['msoa11cd', 'year'], ascending=True).reset_index(drop=True)
-            msoa_convert = msoa_convert.groupby(['msoa11cd', 'area_type', 'north', 'year', 'scenario']).sum().reset_index()
-            msoa_convert = msoa_convert[['scenario','msoa11cd', 'north', 'year', 'population']]
-            area_info = msoa_convert.merge(area_zones[['msoa11cd', 'tfn_area_type']], on='msoa11cd', how='left').rename(
-                columns={'msoa11cd': 'zone', 'tfn_area_type': 'area_type'})
-            area_info = area_info[["scenario", "zone", "north", "area_type", "year", "population"]]
+        msoa_convert = msoa_zones[['nohamZoneID', 'msoa11cd', 'overlap_noham_split_factor']].merge(area_info,
+                                                                                                   on='nohamZoneID',
+                                                                                                   how='left')
+        msoa_convert['population'] = msoa_convert['population'] * msoa_convert['overlap_noham_split_factor']
+        msoa_convert = msoa_convert.sort_values(by=['msoa11cd', 'year'], ascending=True).reset_index(drop=True)
+        msoa_convert = msoa_convert.groupby(['msoa11cd', 'area_type', 'north', 'year', 'scenario']).sum().reset_index()
+        msoa_convert = msoa_convert[['scenario','msoa11cd', 'north', 'year', 'population']]
+        area_info = msoa_convert.merge(area_zones[['msoa11cd', 'tfn_area_type']], on='msoa11cd', how='left').rename(
+            columns={'msoa11cd': 'zone', 'tfn_area_type': 'area_type'})
+        area_info = area_info[["scenario", "zone", "north", "area_type", "year", "population"]]
 
-            self.area_info = area_info.copy()
-            area_info = ut.interpolate_timeline(
-                area_info,
-                grouping_vars=["scenario", "zone", "north", "area_type"],
-                value_var="population",
-                melt=False)
-            area_info.to_csv("interpolated_area_info.csv")
+        self.area_info = area_info.copy()
+        area_info = ut.interpolate_timeline(
+            area_info,
+            grouping_vars=["scenario", "zone", "north", "area_type"],
+            value_var="population",
+            melt=False)
+        area_info.to_csv("interpolated_area_info.csv")
 
-        self.scenario_rename = {"BAU": "SC01", "AE": "SC02", "BAUH": "SC03", "AEH": "SC04","BAUL": "SC05", "AEL": "SC06",
-                                "Business As Usual Core": "SC01", "Accelerated EV Core": "SC02"}
+        self.scenario_rename = {"BAU": "SC01", "AE": "SC02", "BAUH": "SC03", "AEH": "SC04","BAUL": "SC05",
+                                "AEL": "SC06", "Business As Usual Core": "SC01", "Accelerated EV Core": "SC02"}
         scenario_full_name = {"SC01": "Business As Usual Core",
                               "SC02": "Accelerated EV Core"}
 
@@ -171,12 +166,15 @@ class SummaryOutputs:
         else:
             file_name = "scenario" + self.pathway.capitalize()
 
+        config = cf.ConfigParser(interpolation=cf.ExtendedInterpolation())
+        config.read("config_local.txt")
+
         for i in ["Business As Usual Core", "Accelerated EV Core"]:
             pt_emission_index_reductions = pd.read_excel(
-                io=self.configuration["filePaths"][file_name],
+                io=config["filePaths"][file_name],
                 sheet_name=i,
                 header=1,
-                usecols=self.configuration["fileStructure"]["ptEmissionReduction"]).dropna()
+                usecols=config["fileStructure"]["ptEmissionReduction"]).dropna()
             pt_emission_index_reductions = pt_emission_index_reductions.rename(
                 columns=lambda x: re.sub("\.[0-9]$", "", str(x)))
             pt_emission_index_reductions = ut.camel_columns_to_snake(pt_emission_index_reductions)
@@ -190,10 +188,10 @@ class SummaryOutputs:
             pt_emission_index_reductions["scenario_full_name"] = i
             pt = pt.append(pt_emission_index_reductions, ignore_index=True)
 
-        pt_emissions = pd.read_excel(io=self.configuration["filePaths"]["generalFile"],
+        pt_emissions = pd.read_excel(io=config["filePaths"]["generalFile"],
                                      sheet_name="general",
                                      header=1,
-                                     usecols=self.configuration["fileStructure"]["baselinePT"]).dropna()
+                                     usecols=config["fileStructure"]["baselinePT"]).dropna()
         pt_emissions = pt_emissions.rename(columns=lambda x: re.sub("\.[0-9]$", "", str(x)))
         pt_emissions = ut.camel_columns_to_snake(pt_emissions)
 
@@ -206,8 +204,9 @@ class SummaryOutputs:
         pt_ghg_factor = self.invariant.pt_ghg_factor
 
         for i in range(len(pt_ghg_factor)):
-            pt_emissions.loc[(pt_emissions["vehicle_type"] == pt_ghg_factor.loc[i]["vehicle_type"]), "pt_ghg_factor"] = \
-            pt_ghg_factor.loc[i]["factor"]
+            pt_emissions.loc[
+                (pt_emissions["vehicle_type"] == pt_ghg_factor.loc[i]["vehicle_type"]),
+                "pt_ghg_factor"] = pt_ghg_factor.loc[i]["factor"]
 
         pt_emissions["tailpipe_mtco2"] = pt_emissions["tailpipe_mtco2"] * pt_emissions["pt_ghg_factor"]
 
@@ -341,9 +340,8 @@ class SummaryOutputs:
             value_label = {"chainage": "Vehicle kms",
                            "tailpipe_mtco2": "Megatonnes of CO" + r"$_2$" + "e"}[value]
 
-            if self.run_type == "msoa":
-                grouping_label = {"area_type": "area type",
-                                  "vehicle_type": "vehicle type"}[grouping]
+            grouping_label = {"area_type": "area type",
+                              "vehicle_type": "vehicle type"}[grouping]
 
             ax = plotting_df.plot.area(x="year", linewidth=0, cmap="viridis", alpha=0.9)
             plt.title("{value_label} by {grouping_label}: {scenario}\n".format(**locals()))
@@ -362,24 +360,23 @@ class SummaryOutputs:
 
         # Prepare the summary emissions / chainage df for plotting
         # Import info related to Area type
-        if self.run_type == "msoa":
-            msoa_area_info = self.area_info.copy()
-            msoa_area_info = msoa_area_info[["zone", "area_type"]].drop_duplicates(subset="zone")
-            msoa_area_info["area_type"] = msoa_area_info["area_type"].replace(
-                {1:"Inner Urban A",
-                2:"Inner Urban B",
-                3:"City Suburban A",
-                4:"City Suburban B",
-                5:"Urban Large (within urban area with pop 100-250k)",
-                6:"Urban Medium (within urban area with pop 25-100k)",
-                7:"Urban Small (within urban area with pop 25-100k)",
-                8:"Rural"})
+        msoa_area_info = self.area_info.copy()
+        msoa_area_info = msoa_area_info[["zone", "area_type"]].drop_duplicates(subset="zone")
+        msoa_area_info["area_type"] = msoa_area_info["area_type"].replace(
+            {1: "Inner Urban A",
+            2: "Inner Urban B",
+            3: "City Suburban A",
+            4: "City Suburban B",
+            5: "Urban Large (within urban area with pop 100-250k)",
+            6: "Urban Medium (within urban area with pop 25-100k)",
+            7: "Urban Small (within urban area with pop 25-100k)",
+            8: "Rural"})
 
-            all_scenarios = self.all_scenarios.copy()
-            all_scenarios = all_scenarios.merge(msoa_area_info,
-                                                how="left",
-                                                on="zone",
-                                                validate="many_to_one")
+        all_scenarios = self.all_scenarios.copy()
+        all_scenarios = all_scenarios.merge(msoa_area_info,
+                                            how="left",
+                                            on="zone",
+                                            validate="many_to_one")
 
         all_scenarios["tailpipe_mtco2"] = all_scenarios["tailpipe_gco2"] * 1e-12
         all_scenarios["grid_mtco2"] = all_scenarios["grid_gco2"] * 1e-12

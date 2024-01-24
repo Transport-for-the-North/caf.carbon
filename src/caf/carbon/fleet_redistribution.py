@@ -1,24 +1,21 @@
 import pandas as pd
 from datetime import datetime
+from load_data import OUT_PATH, DEMOGRAPHICS_DATA, TRAVELLER_DATA
+
 
 class Redistribution:
     """Redistribute the vehicle fleet, using a determined relation from socioeconomic factors."""
-    def __init__(self, config, invariant_obj, scenario_obj, projected_fleet, outpath, run_fresh):
+    def __init__(self, invariant_obj, scenario_obj, projected_fleet, run_fresh):
         """Initialise functions and set class variables.
 
         Parameters
         ----------
-        config : configparser
-            Filepath lookup to import tables.
         invariant_obj : class obj
             Includes the baseline fleet and scenario invariant tables.
         scenario_obj : class obj
             Includes scenario tables.
-        outpath : str
-            Filepath to export preprocessed tables.
         """
-        self.outpath = outpath
-        self.configuration = config
+        self.outpath = OUT_PATH
         self.invariant = invariant_obj
         self.scenario = scenario_obj
         self.projected_fleet = projected_fleet.copy()
@@ -26,7 +23,6 @@ class Redistribution:
         self.run_type = invariant_obj.run_type.lower()
 
         if run_fresh:
-            self.configuration = config
             self.__input_weights()
             self.__redistribution_parameters()
         else:
@@ -34,19 +30,15 @@ class Redistribution:
 
         self.__transform_fleet()
 
-        #########
-        # FLEET #
-        #########
-
     def __load_redistributed_data(self):
         """Load EV weights if already built from data."""
         self.calibration_data = pd.read_csv("{self.outpath}audit/fleet_weights.csv".format(**locals()))
 
     def __input_weights(self):
         """Build EV weights if necessary."""
-        base_pop = pd.read_pickle(self.configuration["filePaths"]["demographicsFile"], compression="bz2")
+        base_pop = pd.read_pickle(DEMOGRAPHICS_DATA, compression="bz2")
         base_pop = base_pop[["MSOA", "tfn_tt", "people"]].rename(columns={"MSOA": "zone"})
-        traveller_types = pd.read_csv(self.configuration["filePaths"]["travellerClassification"])
+        traveller_types = pd.read_csv(TRAVELLER_DATA)
         # deselect traveller types who can not own cars
         deselection_criteria = [["age_str", "under 16"], ["hh_cars", 0]]
         traveller_types["selection"] = 1
@@ -113,13 +105,18 @@ class Redistribution:
                 for par_val in ["A", "B", "C"]:
                     if parameters.loc[par]["step 1 " + par_val] == 0:
                         # try step up
-                        parameters.loc[(parameters.index == par), "par val " + par_val] = parameters.loc[par]["par val " + par_val] - (100 * step_size)
+                        parameters.loc[
+                            (parameters.index == par), "par val " + par_val] = \
+                            parameters.loc[par]["par val " + par_val] - (100 * step_size)
                         self.func(parameters)
-                        if self.calibration_data["product iterative"].sum() < self.calibration_data["product initial"].sum():
+                        if self.calibration_data[
+                            "product iterative"].sum() < self.calibration_data["product initial"].sum():
                             self.calibration_data["product initial"] = self.calibration_data["product iterative"]
                         else:
                             # try step down
-                            parameters.loc[(parameters.index == par), "par val " + par_val] = parameters.loc[par]["par val " + par_val] + (2 * 100 * step_size)
+                            parameters.loc[
+                                (parameters.index == par), "par val " + par_val] = \
+                                parameters.loc[par]["par val " + par_val] + (2 * 100 * step_size)
                             self.func(parameters)
                             if self.calibration_data["product iterative"].sum() < self.calibration_data[
                                     "product initial"].sum():
@@ -176,12 +173,7 @@ class Redistribution:
                                 completion_progress = completion_progress + 1
                                 update = completion_progress * 100 / 27
                                 print("%1.1f percent" % update)
-                    # if (parameters.loc[par]["par val " + par_val] > 1.1) or (parameters.loc[par]["par val " + par_val] < -1.1):
-                    #     print("large value detected, ending associated thread")
-                    #     parameters.loc[(parameters.index == par), "step 1 " + par_val] = 1
-                    #     parameters.loc[(parameters.index == par), "step 2 " + par_val] = 1
-                    #     parameters.loc[(parameters.index == par), "step 3 " + par_val] = 1
-                    #     completion_progress = completion_progress + 1
+
         print("Function parameters determined")
         self.calibration_data = self.calibration_data.reset_index()
         self.calibration_data = self.calibration_data[["zone", "derived ev"]]
@@ -213,34 +205,29 @@ class Redistribution:
         self.projected_fleet["difference"] = self.projected_fleet["derived ev"] - self.projected_fleet["ev"]
         self.projected_fleet.loc[self.projected_fleet["difference"] > 0, "dir"] = 1
         self.projected_fleet.loc[self.projected_fleet["difference"] < 0, "dir"] = -1
-        self.projected_fleet.loc[self.projected_fleet["difference"] < 0, "difference"] = -1 * self.projected_fleet["difference"]
+        self.projected_fleet.loc[self.projected_fleet["difference"] < 0, "difference"] = \
+            -1 * self.projected_fleet["difference"]
 
         self.projected_fleet["fleet to reassign"] = 0
         # fleet to reassign = dif * total vehicles
         # for each row, proportion of total EV tally, non EV tally. Then add x to ice and subtract x from EV
-        self.projected_fleet.to_csv("projected fleet 1.csv")
         self.projected_fleet["fleet to reassign"] = self.projected_fleet["total vehicles"] * self.projected_fleet["difference"]
         self.projected_fleet.loc[self.projected_fleet["cohort"] > 2030, "fleet to reassign"] = 0
-        self.projected_fleet.to_csv("projected fleet 2.csv")
         self.projected_fleet.loc[self.projected_fleet["vehicle_type"] == "hgv", "fleet to reassign"] = 0
-        self.projected_fleet.to_csv("projected fleet 3.csv")
-        # tally = tally plus the corrective difference needed for the zone (positive for EVs, negative for ICEs) distributed proportionally across the segmentation of vehicles in that zone
-        self.projected_fleet.loc[self.projected_fleet["fuel"].isin(["bev", "phev"]), "tally"] = self.projected_fleet["tally"] + (self.projected_fleet["dir"] * self.projected_fleet["fleet to reassign"] * (self.projected_fleet["tally"] / self.projected_fleet["total vehicles"] * self.projected_fleet["ev"]))
-        self.projected_fleet.loc[self.projected_fleet["fuel"].isin(["petrol", "diesel", "petrol hybrid"]), "tally"] = self.projected_fleet["tally"] - (self.projected_fleet["dir"] * self.projected_fleet["fleet to reassign"] * (self.projected_fleet["tally"] / self.projected_fleet["total vehicles"] * (1 - self.projected_fleet["ev"])))
-        self.projected_fleet.to_csv("projected fleet 4.csv")
+        # tally = tally plus the corrective difference needed for the zone (positive for EVs, negative for ICEs)
+        # distributed proportionally across the segmentation of vehicles in that zone
+        self.projected_fleet.loc[self.projected_fleet["fuel"].isin(["bev", "phev"]), "tally"] = \
+            self.projected_fleet["tally"] + (self.projected_fleet["dir"] * self.projected_fleet["fleet to reassign"] *
+                                             (self.projected_fleet["tally"] / self.projected_fleet["total vehicles"] *
+                                              self.projected_fleet["ev"]))
+        self.projected_fleet.loc[self.projected_fleet["fuel"].isin(["petrol", "diesel", "petrol hybrid"]), "tally"] = \
+            self.projected_fleet["tally"] - (self.projected_fleet["dir"] * self.projected_fleet["fleet to reassign"] *
+                                             (self.projected_fleet["tally"] / self.projected_fleet["total vehicles"] *
+                                              (1 - self.projected_fleet["ev"])))
 
-        # reassignment_fleet = self.projected_fleet[["fuel", "segment", "fleet to reassign", "cohort", "year", "vehicle_type"]].copy()
-        # reassignment_fleet = reassignment_fleet.groupby(["fuel", "segment", "cohort", "year", "vehicle_type"], as_index=False).sum()
-        self.projected_fleet = self.projected_fleet[["fuel", "segment", "zone", "tally", "vehicle_type", "cohort", "year", "dir", "difference"]]
-        # self.projected_fleet.to_csv("projected fleet 4.csv")
-        # self.projected_fleet.loc[self.projected_fleet["dir"] != 1, "difference"] = 0
-        # self.projected_fleet["difference"] = self.projected_fleet["difference"]/self.projected_fleet["difference"].sum()
-        # self.projected_fleet = self.projected_fleet.merge(reassignment_fleet, how="left", on=["fuel", "segment", "cohort", "year", "vehicle_type"])
-        # self.projected_fleet["tally"] = self.projected_fleet["tally"] + (self.projected_fleet["difference"]*self.projected_fleet["fleet to reassign"])
-        # self.projected_fleet = self.projected_fleet[["fuel", "segment", "zone", "tally", "vehicle_type", "cohort", "year"]]
+        self.projected_fleet = self.projected_fleet[["fuel", "segment", "zone", "tally", "vehicle_type", "cohort",
+                                                     "year", "dir", "difference"]]
         self.projected_fleet.loc[self.projected_fleet["tally"] < 0, "tally"] = 0
-        # if EV derived > EV base add EV, if EV derive < EV base subtract EV, if EV difference less than 1 EV do nothing
-        # if uneven only do bottom 50 or top 50 etc to keep things even, smth like that
         print("Reassignment of fleet complete.")
 
     def func(self, parameters):
@@ -249,16 +236,19 @@ class Redistribution:
         self.calibration_data["first order"] = (parameters.iloc[0]["par val A"] * self.calibration_data["soc 1"]) + \
             (parameters.iloc[1]["par val A"] * self.calibration_data["soc 2"]) + \
             (parameters.iloc[2]["par val A"] * self.calibration_data["soc 3"])
-        self.calibration_data["second order"] = (parameters.iloc[0]["par val B"] * self.calibration_data["soc 1"] * self.calibration_data["soc 1"]) + \
+        self.calibration_data["second order"] = (parameters.iloc[0]["par val B"] * self.calibration_data["soc 1"] *
+                                                self.calibration_data["soc 1"]) + \
             (parameters.iloc[1]["par val B"] * self.calibration_data["soc 2"] * self.calibration_data["soc 2"]) + \
             (parameters.iloc[2]["par val B"] * self.calibration_data["soc 3"] * self.calibration_data["soc 3"])
         self.calibration_data["third order"] = (parameters.iloc[0]["par val C"] * self.calibration_data["soc 1"] *
-                                                 self.calibration_data["soc 1"] * self.calibration_data["soc 1"]) + \
+                                                self.calibration_data["soc 1"] * self.calibration_data["soc 1"]) + \
                                                 (parameters.iloc[1]["par val C"] * self.calibration_data["soc 2"] *
-                                                 self.calibration_data["soc 2"] * self.calibration_data["soc 2"]) + \
+                                                self.calibration_data["soc 2"] * self.calibration_data["soc 2"]) + \
                                                 (parameters.iloc[2]["par val C"] * self.calibration_data["soc 3"] *
-                                                 self.calibration_data["soc 3"] * self.calibration_data["soc 3"])
+                                                self.calibration_data["soc 3"] * self.calibration_data["soc 3"])
 
         self.calibration_data["derived ev"] = self.calibration_data["first order"] + \
             self.calibration_data["second order"] + self.calibration_data["third order"]
-        self.calibration_data["product iterative"] = (self.calibration_data["derived ev"] - self.calibration_data["ev"]) * (self.calibration_data["derived ev"] - self.calibration_data["ev"])
+        self.calibration_data["product iterative"] = (self.calibration_data["derived ev"] -
+                                                      self.calibration_data["ev"]) * \
+                                                     (self.calibration_data["derived ev"] - self.calibration_data["ev"])

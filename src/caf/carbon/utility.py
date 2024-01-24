@@ -1,8 +1,7 @@
 import re
-
+import configparser as cf
 import pandas as pd
-
-from lib import audit_tests as at
+import audit_tests as at
 
 
 # %% Helper functions
@@ -36,16 +35,19 @@ def all_but(table_df, names):
 
 
 def group_to_list_string(start, end):
-    """Give interval [start,end] as a comma seperated string."""
+    """Give interval [start,end] as a comma separated string."""
     cya_list = list(range(start, end + 1))
     return ",".join(map(str, cya_list))
 
 
-def load_table(self, table_name, table_type=None, suffix="File"):  
-    """Load table from an excel sheet containing multiple tables.
+def load_table(self, table_name, table_type=None, suffix="File"):
+    """Load table from an Excel sheet containing multiple tables.
     
     Path, sheet and position are loaded from the config.txt settings.
     """
+    config = cf.ConfigParser(interpolation=cf.ExtendedInterpolation())
+    config.read("config_local.txt")
+
     if table_type is None:
         table_type = self.type
         header_row = 1
@@ -53,17 +55,15 @@ def load_table(self, table_name, table_type=None, suffix="File"):
         header_row = 2
     if suffix in ["None", ""]:
         suffix = "File"
-    file_path = self.configuration["filePaths"][table_type + suffix]
+    file_path = config["filePaths"][table_type + suffix]
     table = pd.read_excel(
-        io=file_path, 
+        io=file_path,
         sheet_name=self.scenario_name,
-        usecols=self.configuration["fileStructure"][table_name],
+        usecols=config["fileStructure"][table_name],
         header=header_row).dropna()
-    
-    # Remove column suffixes (eg. second 2018 column is called 2018.2)
+    # Remove column suffixes (e.g. second 2018 column is called 2018.2)
     table = table.rename(columns=lambda x: re.sub("\.[0-9]$", "", str(x)))
     table = camel_columns_to_snake(table)
-    
     at.describe_table(table_name, table, file_path)
     return table
 
@@ -73,9 +73,11 @@ def load_csv(self, table_name):
     
     Path is loaded from the config.txt settings.
     """
-    file_path = self.configuration["filePaths"][table_name + "File"]
+    config = cf.ConfigParser(interpolation=cf.ExtendedInterpolation())
+    config.read("config_local.txt")
+
+    file_path = config["filePaths"][table_name + "File"]
     table = pd.read_csv(file_path)
-    
     table = camel_columns_to_snake(table)
     at.describe_table(table_name, table, file_path)
     return table
@@ -90,8 +92,8 @@ def cya_group_to_list(table_df):
     table_df = table_df.copy()
 
     recode = {"00": 0, "01": 1, "02": 2, "03": 3, "04": 4, "05": 5, "06_08": group_to_list_string(6, 8),
-              "09_11": group_to_list_string(9, 11), "12_14": group_to_list_string(12, 14), "15+": group_to_list_string(15, 20)}
-    
+              "09_11": group_to_list_string(9, 11), "12_14": group_to_list_string(12, 14),
+              "15+": group_to_list_string(15, 20)}
     table_df["cya"] = table_df["cya"].replace(recode)
     return table_df
 
@@ -144,7 +146,6 @@ def weighted_mean(table_df, grouping_var_list, weight_var, mean_var_list):
     mean_var_list = if_string_then_list(mean_var_list)
     table_df = table_df.copy()
     mutable_columns = mean_var_list + [weight_var]
-    
     table_df[mean_var_list] = table_df[mean_var_list].mul(table_df[weight_var], axis=0)
     table_df = table_df.groupby(grouping_var_list)[mutable_columns].sum().reset_index()
     table_df[mean_var_list] = table_df[mean_var_list].div(table_df[weight_var], axis=0)
@@ -177,18 +178,18 @@ def cya_list_to_column(table_df, shared_value=None):
 
     Returns
     ----------
-    """   
+    """
     table_df = table_df.copy()
     table_df["cya"] = table_df["cya"].astype("str").str.split(",")
     table_df["cya"] = table_df["cya"].apply(lambda x: [int(i) for i in x])
-    
+
     if shared_value is not None:
         pre_count = table_df[shared_value].sum()
         table_df[shared_value] = table_df[shared_value].div(table_df["cya"].map(len), axis=0)
 
     table_df = table_df.explode("cya")
     table_df["cya"] = table_df["cya"].astype("int64")
-    
+
     if shared_value is not None:
         post_count = table_df[shared_value].sum()
         at.change_in_count("cya", shared_value, pre_count, post_count)
@@ -217,24 +218,25 @@ def determine_from_similar(table_df, shared_qualities, missing_quality, value_to
     ----------
     table_df : DataFrame
         Dataframe with unknown values mapped to known values. 
-    """    
+    """
     pre_count = table_df[value_to_distribute].sum()
 
     table_df = table_df.copy()
     table_df[missing_quality] = table_df[missing_quality].replace({"Unknown": "unknown"})
     reduced_table = table_df.groupby(shared_qualities + [missing_quality])[value_to_distribute].sum().reset_index()
     missing_table = reduced_table.loc[(reduced_table[missing_quality] == "unknown")].drop(columns=missing_quality)
-    
+
     # Define distribution of the imputed attribute in the data when the missing values are removed.
     reduced_table = reduced_table.loc[~(reduced_table[missing_quality] == "unknown")]
-    reduced_table["share"] = reduced_table[value_to_distribute]/reduced_table.groupby(shared_qualities)[value_to_distribute].transform("sum")
+    reduced_table["share"] = reduced_table[value_to_distribute]/reduced_table.groupby(
+        shared_qualities)[value_to_distribute].transform("sum")
     reduced_table = reduced_table.drop(columns=value_to_distribute)
 
     # Assign missing values according to the distribution
     missing_table = missing_table.merge(reduced_table, how="left", on=shared_qualities)
     missing_table["distributed_value"] = missing_table[value_to_distribute] * missing_table["share"]
     missing_table = missing_table.drop(columns=[value_to_distribute, "share"])
-    
+
     # Distribute the imputed values across the non-grouped subset of missing values
     unkn_table_df = table_df.loc[(table_df[missing_quality] == "unknown")]
     unkn_table_df = unkn_table_df.drop(columns=missing_quality)
@@ -242,11 +244,11 @@ def determine_from_similar(table_df, shared_qualities, missing_quality, value_to
     unkn_table_df = unkn_table_df.merge(missing_table, how="left", on=shared_qualities)
     unkn_table_df[value_to_distribute] = unkn_table_df["distributed_value"] * unkn_table_df["share"]
     unkn_table_df = unkn_table_df.drop(columns=["share",  "distributed_value"])
-    
+
     # Append imputed subset to the original dataframe after removing the missing values
     kn_table_df = table_df.loc[~(table_df[missing_quality] == "unknown")]
     table_df = kn_table_df._append(unkn_table_df, ignore_index=True)
-    
+
     # Check that the value to distribute still sums to the same total as before the imputation
     post_count = table_df[value_to_distribute].sum()
     at.change_in_count(missing_quality, value_to_distribute, pre_count, post_count)
@@ -271,7 +273,7 @@ def interpolate_timeline(table_df, grouping_vars, value_var, melt=True):
     ----------
     table_df : DataFrame
         Dataframe with full set of years. 
-    """    
+    """
     if melt:
         table_df = pd.melt(
             table_df,

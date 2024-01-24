@@ -1,12 +1,12 @@
 from datetime import datetime
-
+from load_data import OUT_PATH
 import numpy as np
 import pandas as pd
 
 
 class NormaliseOutputs:
 
-    def __init__(self, summary_outputs_obj, outpath):
+    def __init__(self, summary_outputs_obj):
         """
         Convert summary outputs into Third Normal Form.
 
@@ -21,18 +21,19 @@ class NormaliseOutputs:
         """
 
         self.summary_outputs = summary_outputs_obj
-        self.outpath = outpath
+        self.outpath = OUT_PATH
         self.import_lookup_tables = False
         self.date = datetime.today().strftime('%Y_%m_%d')
         self.run_type = self.summary_outputs.run_type
-        
         if self.import_lookup_tables:
             if self.run_type == "nelum":
-                self.nelum_zone = pd.read_csv(outpath + "postgres_output_tables/data_zonal/nelum_zone_postgres.csv")
+                self.nelum_zone = pd.read_csv(
+                    self.outpath + "postgres_output_tables/data_zonal/nelum_zone_postgres.csv")
             elif self.run_type == "noham":
-                self.nelum_zone = pd.read_csv(outpath + "postgres_output_tables/data_zonal/noham_zone_postgres.csv")
-            self.dft_segment = pd.read_csv(outpath + "postgres_output_tables/data_common/dft_segment_postgres.csv")
-            self.future_travel_scenario = pd.read_csv(outpath + "postgres_output_tables/data_common/future_travel_scenario_postgres.csv")
+                self.nelum_zone = pd.read_csv(
+                    self.outpath + "postgres_output_tables/data_zonal/noham_zone_postgres.csv")
+            self.dft_segment = pd.read_csv(self.outpath + "postgres_output_tables/data_common/dft_segment_postgres.csv")
+            self.future_travel_scenario = pd.read_csv(self.outpath + "postgres_output_tables/data_common/future_travel_scenario_postgres.csv")
         else:
             self.__split_lookup_tables()
 

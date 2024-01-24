@@ -3,27 +3,24 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 
-from lib import utility as ut
-from lib import fleet_redistribution
+import utility as ut
+import fleet_redistribution
+from load_data import OUT_PATH
+
 
 class Model:
     """Predict emissions using emissions, demand and projected fleet data."""
-    def __init__(self, config, time, time_period, filter, invariant_obj, scenario_obj, ev_redistribution, outpath):
+    def __init__(self, time, time_period, filter, invariant_obj, scenario_obj, ev_redistribution):
         """Initialise functions and set class variables.
 
         Parameters
         ----------
-        config : configparser
-            Filepath lookup to import tables.
         invariant_obj : class obj
             Includes the baseline fleet and scenario invariant tables.
         scenario_obj : class obj
             Includes scenario tables.
-        outpath : str
-            Filepath to export preprocessed tables.
         """
-        self.outpath = outpath
-        self.configuration = config
+        self.outpath = OUT_PATH
         self.time = time
         self.time_period = time_period
         self.invariant = invariant_obj
@@ -31,7 +28,7 @@ class Model:
         self.date = datetime.today().strftime('%Y_%m_%d')
         self.run_type = invariant_obj.run_type.lower()
         self.ev_redistribution = ev_redistribution
-        self.filter = filter
+        self.region_filter = filter
         self.__predict_fleet_size()
         self.__create_future_fleet()
         self.__predict_sales()
@@ -48,17 +45,14 @@ class Model:
         Returns a df by vehicle type and tally.
         """
         fleet_size = self.invariant.index_fleet.fleet.copy()
-        # fleet_size = fleet_size.groupby("vehicle_type")["tally"].sum().reset_index()
-        # fleet_size = fleet_size.merge(self.scenario.type_fleet_size_growth, how="left", on="vehicle_type")
-        # fleet_size["tally"] = fleet_size["tally"] * fleet_size["index_fleet_growth"]
-        fleet_size = fleet_size.loc[fleet_size['zone'].isin(self.filter["msoa11_id"])].reset_index(drop=True)
+        fleet_size = fleet_size.loc[fleet_size['zone'].isin(self.region_filter["msoa11_id"])].reset_index(drop=True)
         fleet_size = fleet_size.groupby("vehicle_type")["tally"].sum().reset_index()
         fleet_size = fleet_size.merge(self.scenario.type_fleet_size_growth, how="left", on="vehicle_type")
         fleet_size["tally"] = fleet_size["tally"] * fleet_size["index_fleet_growth"]
 
         fleet_size = ut.interpolate_timeline(
             fleet_size,
-            grouping_vars="vehicle_type",
+            grouping_vars=["vehicle_type"],
             value_var="tally",
             melt=False)
         self.scenario.fleet_size = fleet_size.rename(columns={"tally": "fleet_forecast"})
@@ -99,9 +93,10 @@ class Model:
         future_sales = future_sales.merge(self.scenario.fuel_share_of_year_seg_sales, how="left",
                                           on=["segment", "fuel", "year"])
 
-        # % of all of vehicles sold which are fuel-segment sold to zone
-        # e.g. 12% of all lgvs sold in YEAR are petrol n1 class ii sold to zone 7
-        # zone fuel segment share of type sales = zone share of segment sales * segment share of type sales * fuel share of segment sales
+        # % of all vehicles sold which are fuel-segment sold to zone
+        # e.g. 12% of all LGVs sold in YEAR are petrol n1 class ii sold to zone 7
+        # zone fuel segment share of type sales = zone share of segment sales *
+        # segment share of type sales * fuel share of segment sales
         eqn = "{seg_share}*{segment_sales_distribution}*{segment_fuel_sales_distribution}"
         try:
             future_sales["sales_share"] = future_sales.apply(eqn.format_map, axis=1).map(eval)
@@ -113,10 +108,10 @@ class Model:
         self.scenario.fleet_sales = future_sales[["zone", "segment", "cohort", "fuel", "vehicle_type", "sales_share"]]
 
     @staticmethod
-    def __jumpForward(fleet_df, scrappage_df, fleet_sales_df, tally_df):
+    def __jump_forward(fleet_df, scrappage_df, fleet_sales_df, tally_df):
         """Transform a fleet into the next years fleet."""
 
-        def withdrawCohort(fleet_df, scrappage_df, current_year):
+        def withdraw_cohort(fleet_df, scrappage_df, current_year):
             """Increase cya by 1 and apply scrappage curve."""
             fleet_df = fleet_df.copy()
             fleet_df["cya"] = current_year - fleet_df["cohort"]
@@ -126,7 +121,7 @@ class Model:
             fleet_df = fleet_df.drop(columns=["survival", "cya"])
             return fleet_df
 
-        def injectCohort(fleet_df, fleet_sales_df, tally_df, current_year):
+        def inject_cohort(fleet_df, fleet_sales_df, tally_df, current_year):
             """Add cya = 0 vehicles to match scenario defined fleet size."""
             fleet_df = fleet_df.copy()
             required_fleet = tally_df.loc[tally_df["year"] == current_year]
@@ -145,8 +140,8 @@ class Model:
             return fleet_df
 
         current_year = fleet_df["cohort"].max() + 1
-        fleet_df = withdrawCohort(fleet_df, scrappage_df, current_year)
-        fleet_df = injectCohort(fleet_df, fleet_sales_df, tally_df, current_year)
+        fleet_df = withdraw_cohort(fleet_df, scrappage_df, current_year)
+        fleet_df = inject_cohort(fleet_df, fleet_sales_df, tally_df, current_year)
         return fleet_df, current_year
 
     def __project_fleet(self):
@@ -162,7 +157,7 @@ class Model:
         # Predict the fleet for each year, storing fleets of key model years.
         print("\n\nProjecting fleet:")
         for i in range(self.invariant.index_year, 2050):
-            fleet_df, current_year = self.__jumpForward(fleet_df, scrappage_df, fleet_sales_df, tally_df)
+            fleet_df, current_year = self.__jump_forward(fleet_df, scrappage_df, fleet_sales_df, tally_df)
             print("\r{0}".format(current_year), end="\r")
             if current_year % 5 == 0:
                 fleet_useful_years = fleet_useful_years._append(fleet_df).fillna(current_year)
@@ -170,9 +165,8 @@ class Model:
         fleet_useful_years = fleet_useful_years[fleet_useful_years["tally"] > 0]
 
         if self.ev_redistribution:
-            ev_projected_fleet = fleet_redistribution.Redistribution(self.configuration, self.invariant, self.scenario,
-                                                                     fleet_useful_years,
-                                                                     self.outpath, True).projected_fleet
+            ev_projected_fleet = fleet_redistribution.Redistribution(self.invariant, self.scenario,
+                                                                     fleet_useful_years, True).projected_fleet
             self.projected_fleet = ev_projected_fleet
         else:
             self.projected_fleet = fleet_useful_years
@@ -194,8 +188,9 @@ class Model:
         chainage = pd.merge(self.invariant.anpr, self.scenario.demand, how="left", on=["vehicle_type", "road_type"])
 
         chainage["chainage"] = chainage["chainage"] * chainage["cya_prop_of_bt_rt"]
-        chainage = chainage.groupby(["vehicle_type", "cya", "zone", "speed_band", "year"])["chainage"].sum().reset_index()
-        #fleet_df = self.projected_fleet
+        chainage = chainage.groupby(
+            ["vehicle_type", "cya", "zone", "speed_band", "year"])["chainage"].sum().reset_index()
+
         self.projected_fleet["cya"] = self.projected_fleet["year"] - self.projected_fleet["cohort"]
         self.projected_fleet = ut.cya_column_to_group(self.projected_fleet)
 
@@ -204,19 +199,22 @@ class Model:
         self.projected_fleet["prop_by_fuel_seg_cohort"] = self.projected_fleet["tally"] / \
                                               self.projected_fleet.groupby(["zone", "cya", "vehicle_type", "year"])[
                                                   "tally"].transform("sum")
-        self.projected_fleet = self.projected_fleet.merge(chainage, how="left", on=["vehicle_type", "cya", "zone", "year"])
+        self.projected_fleet = self.projected_fleet.merge(chainage, how="left", on=[
+            "vehicle_type", "cya", "zone", "year"])
 
         if self.run_type == "msoa":
-            self.projected_fleet = self.projected_fleet.merge(self.invariant.new_area_types[["zone", "msoa_area_type"]], how="left", on="zone")
+            self.projected_fleet = self.projected_fleet.merge(self.invariant.new_area_types[["zone", "msoa_area_type"]],
+                                                              how="left", on="zone")
             self.projected_fleet = self.projected_fleet.merge(self.scenario.km_index_reductions, how="left",
                                       on=["year", "vehicle_type", "msoa_area_type"])
 
         # Use tally share to distribute chainage
-        self.projected_fleet["chainage"] = self.projected_fleet["chainage"] * self.projected_fleet["prop_by_fuel_seg_cohort"]
+        self.projected_fleet["chainage"] = self.projected_fleet["chainage"] * \
+                                           self.projected_fleet["prop_by_fuel_seg_cohort"]
         # Apply scenario based nelum area type travel reductions
-        self.projected_fleet["chainage"] = self.projected_fleet["chainage"] * self.projected_fleet["km_reduction"].fillna(0)
+        self.projected_fleet["chainage"] = self.projected_fleet["chainage"] * \
+                                           self.projected_fleet["km_reduction"].fillna(0)
         self.projected_fleet = self.projected_fleet.drop(columns=["cya", "prop_by_fuel_seg_cohort", "km_reduction"])
-        #self.projected_fleet = fleet_df
 
     def predict_emissions(self):
         """Convert chainage and emission intensity to emissions."""
@@ -232,27 +230,27 @@ class Model:
         fleet_df["index_carbon_reduction"] = fleet_df["index_carbon_reduction"].fillna(1)
 
         # petrol and diesel biofuel component reductions
-        biocorrection = self.invariant.biofuel_reduction
-        bins = biocorrection["switch_year"]
+        bio_correction = self.invariant.biofuel_reduction
+        bins = bio_correction["switch_year"]
         year_labels = []
-        for i in range(len(biocorrection["switch_year"])):
+        for i in range(len(bio_correction["switch_year"])):
             if i > 0:
-                year_labels.append(biocorrection["switch_year"].loc[i])
+                year_labels.append(bio_correction["switch_year"].loc[i])
 
         fleet_df["binned"] = pd.cut(fleet_df["year"], bins, labels=year_labels)
         fleet_df["biocorrection"] = 1.0
-        for i in range(len(biocorrection["switch_year"])):
+        for i in range(len(bio_correction["switch_year"])):
             # petrol correction
             fleet_df.loc[((fleet_df["fuel"] == "petrol") & (
-                        fleet_df["binned"] == biocorrection["switch_year"].loc[i])), "biocorrection"] = \
-            biocorrection.loc[i]["petrol"]
+                        fleet_df["binned"] == bio_correction["switch_year"].loc[i])), "biocorrection"] = \
+                        bio_correction.loc[i]["petrol"]
             # diesel correction
             fleet_df.loc[((fleet_df["fuel"] == "diesel") & (
-                        fleet_df["binned"] == biocorrection["switch_year"].loc[i])), "biocorrection"] = \
-            biocorrection.loc[i]["diesel"]
+                        fleet_df["binned"] == bio_correction["switch_year"].loc[i])), "biocorrection"] = \
+                        bio_correction.loc[i]["diesel"]
 
         # GHG equivalents
-        ghg_factor = self.invariant.GHG_equivalent
+        ghg_factor = self.invariant.ghg_equivalent
         for i in range(len(ghg_factor)):
             fleet_df.loc[((fleet_df["fuel"] == ghg_factor.loc[i]["fuel"]) & (
                         fleet_df["segment"] == ghg_factor.loc[i]["segment"])), "ghg_factor"] = ghg_factor.loc[i][
@@ -291,10 +289,9 @@ class Model:
         self.projected_fleet["scenario"] = self.scenario.scenario_code
         if self.time_period:
             self.projected_fleet.to_csv(
-                "{self.outpath}{self.scenario.scenario_initials}_fleet_emissions_{self.run_type}_{self.date}_{self.time}.csv".format(
-                **locals()), index=False)
+                "{self.outpath}{self.scenario.scenario_initials}"
+                "_fleet_emissions_{self.run_type}_{self.date}_{self.time}.csv".format(**locals()), index=False)
         else:
             self.projected_fleet.to_csv(
-                "{self.outpath}{self.scenario.scenario_initials}_fleet_emissions_{self.run_type}_{self.date}.csv".format(
-                    **locals()), index=False)
-
+                "{self.outpath}{self.scenario.scenario_initials}"
+                "_fleet_emissions_{self.run_type}_{self.date}.csv".format(**locals()), index=False)

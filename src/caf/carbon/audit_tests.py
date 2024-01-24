@@ -3,7 +3,7 @@ def describe_table(table_name, table, file_path):
     """Print summary information about imported tables for sense checking."""
     print('\n')
     print("Loaded {0} with {1[0]} rows, {1[1]} columns from '{2}'".format(table_name, table.shape, file_path))
-    print(table.head(3))    
+    print(table.head(3))
     return None
 
 

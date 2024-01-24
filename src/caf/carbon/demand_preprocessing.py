@@ -1,4 +1,5 @@
 import pandas as pd
+from load_data import DEMAND_FACTORS, DEMAND_DATA, LINK_DATA
 
 class Demand:
     """Predict emissions using emissions, demand and projected fleet data."""
@@ -18,14 +19,39 @@ class Demand:
             Filepath to export preprocessed tables.
         """
 
-        self.years = ["2018"]
-        self.link_lookup = pd.read_csv(r"E:\GitHub\caf.carbon\src\caf\carbon\Fleet Emissions Tool\2018\noham2018_lad21.csv")
+        self.demand_factors = pd.read_csv(DEMAND_FACTORS)
+        self.demand_data_path = DEMAND_DATA
+        self.demand_data_path = LINK_DATA
+        self.years = [2018, 2020, 2025, 2030, 2035, 2040, 2045, 2050]
+        self.link_lookup = pd.read_csv(LINK_DATA)
 
         for year in self.years:
             self.year_demand = self.process_demand(year)
 
-
     def process_demand(self, year):
+        """ Reformat demand into the correct format for CAFCarb"""
+        years = 2018
+        user_classes = ['UC1', 'UC2', 'UC3', 'UC4', 'UC5']
+        time_period = ['TS1', 'TS2', 'TS3']
+
+        if year == 2018:
+            scenarios = ['base']
+        else:
+            scenarios = ['core']
+        for scenario in scenarios:
+            for user_class in user_classes:
+                for time in time_period:
+                    #
+                    # link_oa = pd.read_csv(
+                    #     r"Y:\Carbon\QCR_Assignments\07.Noham_to_NoCarb\Link_OA_lookups\2018\link_LTB_spatial.csv").drop(
+                    #     ['Unnamed: 0'], axis=1)
+                    if year == 2018:
+                        route_table = pd.DataFrame(pd.read_hdf(
+                            fr"G:\raw_data\4019 - road OD flows\Satpig\QCR\2018\RotherhamBase_i8c_2018_{time}_v107_SatPig_{user_class}.h5")).reset_index()
+                    else:
+                        route_table = pd.DataFrame(pd.read_hdf(
+                            fr"G:\raw_data\4019 - road OD flows\Satpig\QCR\{year}\{scenario}\NoHAM_QCR_DM_{scenario}_{year}_{time}_v107_SatPig_{user_class}.h5")).reset_index()
+
         year_demand_ts1 = pd.read_csv(
             r"E:\GitHub\caf.carbon\src\caf\carbon\Fleet Emissions Tool\%s\link_table_NoHAM_%s_TS1_v106_I6.csv" % (year, year))
         year_demand_ts2 = pd.read_csv(

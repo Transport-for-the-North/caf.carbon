@@ -1,7 +1,7 @@
 import pandas as pd
 import math
 
-from lib import utility as ut
+import utility as ut
 
 
 class Rail:
