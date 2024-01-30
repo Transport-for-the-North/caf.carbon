@@ -1,5 +1,7 @@
+# Third Party
 import pandas as pd
 from load_data import DEMAND_FACTORS, DEMAND_DATA, LINK_DATA
+
 
 class Demand:
     """Predict emissions using emissions, demand and projected fleet data."""

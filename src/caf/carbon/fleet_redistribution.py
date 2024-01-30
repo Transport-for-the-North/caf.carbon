@@ -1,6 +1,10 @@
-import pandas as pd
+# Built-Ins
 from datetime import datetime
 from load_data import OUT_PATH, DEMOGRAPHICS_DATA, TRAVELLER_DATA
+
+
+# Third Party
+import pandas as pd
 
 
 class Redistribution:

@@ -1,6 +1,9 @@
-import pandas as pd
-import numpy as np
+# Built-Ins
 import os
+
+# Third Party
+import numpy as np
+import pandas as pd
 
 
 def select_oa(lta, link_oa):
