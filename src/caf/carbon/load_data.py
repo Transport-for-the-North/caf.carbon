@@ -3,6 +3,8 @@ Specify input and output folder locations
 """
 from pathlib import Path
 
+data_path = Path.cwd()
+
 # fleet emissions tool data
 REGION_FILTER = \
     Path.cwd() / \
@@ -62,7 +64,7 @@ FUEL_SHARE = \
 
 DEMAND_PATH = \
     Path.cwd() / \
-    "CAFCarb" / "input" / "demand" / "TfSE"
+    "src" / "caf" / "carbon""CAFCarb" / "input" / "demand" / "TfSE"
 
 CAR_PATH = \
     Path.cwd() / \

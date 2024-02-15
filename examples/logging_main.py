@@ -1,9 +1,7 @@
 import logging
-from load_data import LOG_PATH
-import fleet_emission_model
-import vkm_emissions_model
+from caf.carbon.load_data import LOG_PATH
+from caf.carbon import fleet_emission_model, vkm_emissions_model
 from caf.toolkit.log_helpers import LogHelper, ToolDetails
-
 
 def main():
     """Run CAF.Carbon"""
@@ -36,7 +34,6 @@ def main():
 
 
 if __name__ == '__main__':
-
     log = logging.getLogger('__main__')
     log.setLevel(logging.DEBUG)
     details = ToolDetails("caf.carbon", "1.0.0")

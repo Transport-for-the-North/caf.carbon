@@ -1,6 +1,6 @@
 # Built-Ins
 from datetime import datetime
-from load_data import OUT_PATH, DEMOGRAPHICS_DATA, TRAVELLER_DATA
+from caf.carbon.load_data import OUT_PATH, DEMOGRAPHICS_DATA, TRAVELLER_DATA
 
 
 # Third Party

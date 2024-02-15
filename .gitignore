@@ -145,5 +145,5 @@ dmypy.json
 .pyre/
 
 src/caf/carbon/2018/
-src/caf/carbon/CAFCarb/
 src/caf/carbon/functional analysis/
+examples/CAFCarb/

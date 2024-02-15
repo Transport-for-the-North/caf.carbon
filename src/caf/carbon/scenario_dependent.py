@@ -1,7 +1,7 @@
 import pandas as pd
-import utility as ut
+from caf.carbon import utility as ut
 import configparser as cf
-from load_data import SEG_SHARE, FUEL_SHARE, DEMAND_PATH
+from caf.carbon.load_data import SEG_SHARE, FUEL_SHARE, DEMAND_PATH
 
 
 class Scenario:

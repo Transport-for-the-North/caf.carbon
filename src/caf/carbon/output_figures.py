@@ -6,9 +6,9 @@ import configparser as cf
 import pandas as pd
 import numpy as np
 
-from src.caf.carbon import utility as ut
+from caf.carbon import utility as ut
 
-from load_data import OUT_PATH, NOHAM_AREA_TYPE, NOHAM_TO_MSOA, TARGET_AREA_TYPE
+from caf.carbon.load_data import OUT_PATH, NOHAM_AREA_TYPE, NOHAM_TO_MSOA, TARGET_AREA_TYPE
 
 
 class SummaryOutputs:

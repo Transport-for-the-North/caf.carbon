@@ -1,8 +1,7 @@
 import configparser as cf
 import pandas as pd
-import output_figures
-from src.caf.carbon import projection, scenario_dependent, scenario_invariant
-from load_data import REGION_FILTER, OUT_PATH
+from caf.carbon import projection, scenario_dependent, scenario_invariant, output_figures
+from caf.carbon.load_data import REGION_FILTER, OUT_PATH
 
 
 class FleetEmissionsModel:
