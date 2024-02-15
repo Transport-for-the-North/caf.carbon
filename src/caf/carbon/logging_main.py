@@ -1,7 +1,8 @@
 import logging
-import fleet_emission_model, vkm_emissions_model
-from caf.toolkit.log_helpers import LogHelper, ToolDetails
 from load_data import LOG_PATH
+import fleet_emission_model
+import vkm_emissions_model
+from caf.toolkit.log_helpers import LogHelper, ToolDetails
 
 
 def main():
@@ -9,12 +10,12 @@ def main():
     # Which regions is the model being run for?
     # ["North West", "North East", "Yorkshire and The Humber", "East of England"
     #  "East Midlands", "West Midlands", "South East", "South West"]
-    regions = ["North West", "North East", "Yorkshire and The Humber"]
+    regions = ["South East"]
 
     log.info("Starting weighted translation")
 
     # Which travel scenarios to run with? ["Business As Usual Core", "Accelerated EV Core"]
-    scenarios = ["Business As Usual Core"]
+    scenarios = ["Business As Usual Core", "Accelerated EV Core"]
 
     # Distribute EVs without income assumptions (False) or with income factors (True)?
     ev_redistribution = False

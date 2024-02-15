@@ -1,5 +1,5 @@
 import pandas as pd
-from load_data import REGION_FILTER, DEMAND_FACTORS, DEMAND_DATA, LINK_DATA, MSOA_RTM_TRANSLATION, LINK_ROAD_TYPES
+from load_data import REGION_FILTER, DEMAND_FACTORS, DEMAND_DATA, LINK_DATA, MSOA_RTM_TRANSLATION
 
 def batch(iterable, n=1):
     l = len(iterable)
@@ -17,14 +17,10 @@ class Demand:
         self.region_filter = self.region_filter[self.region_filter["region"] == "South East"]
         self.demand_data_path = str(DEMAND_DATA)
         self.link_data_path = str(LINK_DATA)
-        self.link_road_types = pd.read_csv(LINK_ROAD_TYPES)
-        self.link_road_types = self.link_road_types[['a', 'b', 'rdtype']].rename(columns={"rdtype": "road_type"})
-        self.link_road_types['a'] = self.link_road_types['a'].astype(str)
-        self.link_road_types['b'] = self.link_road_types['b'].astype(str)
         self.msoa_rtm_lookup = pd.read_csv(str(MSOA_RTM_TRANSLATION)).rename(columns={"msoa11_id": "origin_zone"})
         self.msoa_rtm_lookup = self.msoa_rtm_lookup[["origin_zone", "SERTM_id", "SERTM_to_msoa11"]]
-        self.msoa_rtm_lookup = self.msoa_rtm_lookup.loc[self.msoa_rtm_lookup['origin_zone'].isin(self.region_filter["msoa11_id"])].reset_index(
-            drop=True)
+        # self.msoa_rtm_lookup = self.msoa_rtm_lookup.loc[self.msoa_rtm_lookup['origin_zone'].isin(self.region_filter["msoa11_id"])].reset_index(
+        #     drop=True)
         self.available_years = available_years
 
         self.car_demand = pd.DataFrame(columns=["origin_zone", "vkm_10-30_kph", "vkm_30-50_kph",
@@ -39,12 +35,15 @@ class Demand:
     def assign_speed_band_vkm(self, link_data, demand_data, user_class, year, component):
         """Assign and classify demand by speed band"""
         user_class_speed = "Speed_" + user_class
+        SE_links = pd.read_csv(f"E:\RTMs\SERTM2\Assignment\south_east_links.csv")
         link_data = link_data[['a', 'b', 'Distance', user_class_speed]]
+        #demand_data = demand_data.loc[demand_data['a'].isin(SE_links['ANode'])].reset_index(drop=True)
+        #demand_data = demand_data.loc[demand_data['b'].isin(SE_links['BNode'])].reset_index(drop=True)
         demand_data = demand_data[['o', 'a', 'b', 'abs_demand']]
         demand_data = demand_data.groupby(['o', 'a', 'b'], as_index=False).sum()
         demand_data = self.spatial_translation(demand_data)
         demand_data = demand_data.merge(link_data, how="left", on=['a', 'b'])
-        if demand_data.empty is False:
+        if demand_data.empty == False:
             print(f"Component {component} contains regional data, processing.")
             demand_data.loc[(demand_data[user_class_speed] < 30), "speed_band"] = "vkm_10-30_kph"
             demand_data.loc[((demand_data[user_class_speed] >= 30) & (
@@ -54,7 +53,7 @@ class Demand:
             demand_data.loc[((demand_data[user_class_speed] >= 70) & (
                         demand_data[user_class_speed] < 90)), "speed_band"] = "vkm_70-90_kph"
             demand_data.loc[(demand_data[user_class_speed] >= 90), "speed_band"] = "vkm_90-110_kph"
-            demand_data = pd.merge(demand_data, self.link_road_types, how="left", on=['a', 'b'])
+
             demand_data['abs_demand'] = demand_data['abs_demand'] * demand_data['Distance'] / 1000
             if user_class in ('UC1', 'UC2', 'UC3'):
                 demand_data['abs_demand'] = demand_data['abs_demand'] * 348 * 1.238
@@ -64,13 +63,14 @@ class Demand:
                 demand_data['abs_demand'] = demand_data['abs_demand'] * 297 * 1.331
             else:
                 print("Could not apply annualisation factors.")
-            demand_data = demand_data[['origin_zone', 'speed_band', 'abs_demand', 'road_type']]
-            demand_data = demand_data.groupby(['origin_zone', 'speed_band', 'road_type'], as_index=False).sum()
-            demand_data = demand_data.pivot_table(values="abs_demand", index=["origin_zone", 'road_type'], columns="speed_band")
+            demand_data = demand_data[['origin_zone', 'speed_band', 'abs_demand']]
+            demand_data = demand_data.groupby(['origin_zone', 'speed_band'], as_index=False).sum()
+
+            demand_data = demand_data.pivot_table(values="abs_demand", index="origin_zone", columns="speed_band")
             demand_data["total_vehicle_km"] = demand_data["vkm_10-30_kph"] + demand_data["vkm_30-50_kph"] + demand_data["vkm_70-90_kph"] + demand_data["vkm_90-110_kph"] + demand_data["vkm_50-70_kph"]
             demand_data["year"] = year
             demand_data = demand_data.reset_index()
-            demand_data = demand_data[["origin_zone", 'road_type', "vkm_10-30_kph", "vkm_30-50_kph", "vkm_50-70_kph", "vkm_70-90_kph",
+            demand_data = demand_data[["origin_zone", "vkm_10-30_kph", "vkm_30-50_kph", "vkm_50-70_kph", "vkm_70-90_kph",
                     "vkm_90-110_kph", "total_vehicle_km", "year"]]
             print("Dataframe component is processed.")
         return demand_data
@@ -102,17 +102,6 @@ class Demand:
         else:
             self.hgv_demand = pd.concat([self.hgv_demand, target], ignore_index=True)
 
-    def interpolate_missing_years(self):
-        """Interpolate and add the missing years to the vkm data."""
-        for vehicle in ["car", "lgv", "hgv"]:
-            self.linear_interpol(vehicle, 2019, 2025, 2018)
-            self.linear_interpol(vehicle, 2019, 2025, 2020)
-            # self.linear_interpol(vehicle, 2025, 2031, 2030)
-            # self.linear_interpol(vehicle, 2031, 2041, 2035)
-            # self.linear_interpol(vehicle, 2031, 2041, 2040)
-            # self.linear_interpol(vehicle, 2041, 2051, 2045)
-            # self.linear_interpol(vehicle, 2041, 2051, 2050)
-
     def spatial_translation(self, dataframe):
         """Interpolate and add the missing years to the vkm data."""
         dataframe = dataframe.rename(columns={"o": "SERTM_id"})
@@ -127,11 +116,11 @@ class Demand:
         """Write out the VKM data"""
         for year in self.available_years:
             car_year_segment = self.car_demand[self.car_demand["year"] == year]
-            car_year_segment.to_csv(fr"vkm_by_speed_and_type_{year}_car.csv")
+            car_year_segment.to_csv(fr"vkm_by_speed_and_type_{year}_car_through.csv")
             lgv_year_segment = self.lgv_demand[self.lgv_demand["year"] == year]
-            lgv_year_segment.to_csv(fr"vkm_by_speed_and_type_{year}_lgv.csv")
+            lgv_year_segment.to_csv(fr"vkm_by_speed_and_type_{year}_lgv_through.csv")
             hgv_year_segment = self.hgv_demand[self.hgv_demand["year"] == year]
-            hgv_year_segment.to_csv(fr"vkm_by_speed_and_type_{year}_hgv.csv")
+            hgv_year_segment.to_csv(fr"vkm_by_speed_and_type_{year}_hgv_through.csv")
 
     def process_demand(self):
         """Reformat demand into the correct format for CAFCarb."""
@@ -153,8 +142,8 @@ class Demand:
                     else:
                         demand_table = pd.DataFrame(pd.read_hdf(self.demand_data_path + fr"\{year}\SE_DM_FY{year}_{time}_net_v002_SatPig_{user_class}.h5")).reset_index()
                         print(f"Loaded demand table")
-                        demand_table["a"] = demand_table["a"].astype(str)
-                        demand_table["b"] = demand_table["b"].astype(str)
+                    demand_table["a"] = demand_table["a"].astype(str)
+                    demand_table["b"] = demand_table["b"].astype(str)
                     demand_max = demand_table['o'].max()
                     for component in batch(range(1, demand_max + 1), 1000):
                         demand_component = demand_table[(demand_table['o'] >= component[0]) & (demand_table['o'] <= component[-1])]
@@ -162,19 +151,15 @@ class Demand:
                         if speed_data.empty == False:
                             if user_class in ('UC1', 'UC2', 'UC3'):
                                 self.car_demand = pd.concat([self.car_demand, speed_data], ignore_index=True)
-                                self.car_demand = self.car_demand.groupby(['origin_zone', 'road_type', 'year'], as_index=False).sum()
+                                self.car_demand = self.car_demand.groupby(['origin_zone', 'year'], as_index=False).sum()
                             elif user_class == 'UC4':
                                 self.lgv_demand = pd.concat([self.lgv_demand, speed_data], ignore_index=True)
-                                self.lgv_demand = self.lgv_demand.groupby(['origin_zone', 'road_type', 'year'], as_index=False).sum()
+                                self.lgv_demand = self.lgv_demand.groupby(['origin_zone', 'year'], as_index=False).sum()
                             elif user_class == 'UC5':
                                 self.hgv_demand = pd.concat([self.hgv_demand, speed_data], ignore_index=True)
-                                self.hgv_demand = self.hgv_demand.groupby(['origin_zone', 'road_type', 'year'], as_index=False).sum()
+                                self.hgv_demand = self.hgv_demand.groupby(['origin_zone', 'year'], as_index=False).sum()
                             else:
                                 print("Could not assign data on user class.")
 
 
-# test1 = Demand([2019])
-# test2 = Demand([2025])
-# test3 = Demand([2031])
-# test4 = Demand([2041])
-test5 = Demand([2051])
+test1 = Demand([2019])

@@ -1,12 +1,13 @@
 import pandas as pd
 import utility as ut
+import configparser as cf
 from load_data import SEG_SHARE, FUEL_SHARE, DEMAND_PATH
 
 
 class Scenario:
     """Load in and preprocess scenario variant tables."""
 
-    def __init__(self, config, filter, time_period, time, scenario_name, invariant_obj, pathway="none"):
+    def __init__(self, filter, time_period, time, scenario_name, invariant_obj, pathway="none"):
         """Initialise functions and set class variables.
 
         Parameters
@@ -22,14 +23,14 @@ class Scenario:
         pathway : str
             Determines whether 'pathway' or standard scenario inputs are called in.
         """
-        self.configuration = config
+        self.configuration = cf.ConfigParser(interpolation=cf.ExtendedInterpolation())
         self.time_period = time_period
         self.time = time
         self.type = "scenario"
         self.region_filter = filter
         self.scenario_name = scenario_name
-        self.index_year = invariant_obj.index_year
         self.invariant = invariant_obj
+        self.index_year = invariant_obj.index_year
         self.__load_keys()
         self.__load_scenario(pathway)
         self.__warp_tables()
@@ -97,9 +98,10 @@ class Scenario:
         # Convert year-on-year change to proportion of previous year
         # Cumulative product gives proportion of index year
         self.type_fleet_size_growth["fleet_growth"] = 1 + self.type_fleet_size_growth["fleet_growth"]
-        self.type_fleet_size_growth["index_fleet_growth"] = self.type_fleet_size_growth.groupby("vehicle_type")["fleet_growth"].cumprod()
+        self.type_fleet_size_growth["index_fleet_growth"] = self.type_fleet_size_growth.groupby(
+            "vehicle_type")["fleet_growth"].cumprod()
         self.type_fleet_size_growth = self.type_fleet_size_growth[["year", "vehicle_type", "index_fleet_growth"]]
-               
+
         self.km_index_reductions[self.index_year] = 0
         self.km_index_reductions = pd.melt(self.km_index_reductions,
                                            id_vars=["vehicle_type", "msoa_area_type"],
@@ -115,33 +117,31 @@ class Scenario:
         demand = self.__load_demand("car")
         demand = pd.concat([demand, self.__load_demand("lgv")], ignore_index=True)
         self.demand = pd.concat([demand, self.__load_demand("hgv")], ignore_index=True)
-
         self.demand = self.demand.loc[self.demand['zone'].isin(self.region_filter["msoa11_id"])].reset_index(drop=True)
 
     def __load_car_demand(self):
         """Load the car demand for a specified scenario."""
         if self.time_period:
-            path = DEMAND_PATH + "/{}/".format(self.scenario_code)
+            path = str(DEMAND_PATH) + f"/{self.scenario_code}/"
 
             # Iterate through all model years loading and appending demand.
-            demand = pd.read_csv("{path}vkm_by_speed_and_type_{self.index_year}_car_{self.time}.csv".format(**locals()))
+            demand = pd.read_csv(f"{path}vkm_by_speed_and_type_{self.index_year}_car_{self.time}.csv")
             demand["Year"] = self.index_year
             for i in range(2020, 2055, 5):
-                x = pd.read_csv("{path}vkm_by_speed_and_type_{i}_car_{self.time}.csv".format(**locals()))
+                x = pd.read_csv(f"{path}vkm_by_speed_and_type_{i}_car_{self.time}.csv")
                 x["Year"] = i
                 demand = demand._append(x)
 
         else:
-            path = DEMAND_PATH + "/{}/".format(self.scenario_code)
+            path = str(DEMAND_PATH) + f"/{self.scenario_code}/"
             # self.configuration["filePaths"]["DemandFile"]
             # Iterate through all model years loading and appending demand.
-            demand = pd.read_csv("{path}vkm_by_speed_and_type_{self.index_year}_car.csv".format(**locals()))
+            demand = pd.read_csv(f"{path}vkm_by_speed_and_type_{self.index_year}_car.csv")
             demand["Year"] = self.index_year
             for i in range(2020, 2055, 5):
-                x = pd.read_csv("{path}vkm_by_speed_and_type_{i}_car.csv".format(**locals()))
+                x = pd.read_csv(f"{path}vkm_by_speed_and_type_{i}_car.csv")
                 x["Year"] = i
                 demand = demand._append(x)
-
             # Drop extra columns
         car_demand = demand[demand.columns.drop(list(demand.filter(regex="perc_")))]
         return car_demand
@@ -149,23 +149,23 @@ class Scenario:
     def __load_hgv_demand(self):
         """Load the hgv demand for a specified scenario."""
         if self.time_period:
-            path = DEMAND_PATH + "/{}/".format(self.scenario_code)
+            path = str(DEMAND_PATH) + f"/{self.scenario_code}/"
 
             # Iterate through all model years loading and appending demand.
-            demand = pd.read_csv("{path}vkm_by_speed_and_type_{self.index_year}_hgv_{self.time}.csv".format(**locals()))
+            demand = pd.read_csv(f"{path}vkm_by_speed_and_type_{self.index_year}_hgv_{self.time}.csv")
             demand["Year"] = self.index_year
             for i in range(2020, 2055, 5):
-                x = pd.read_csv("{path}vkm_by_speed_and_type_{i}_hgv_{self.time}.csv".format(**locals()))
+                x = pd.read_csv(f"{path}vkm_by_speed_and_type_{i}_hgv_{self.time}.csv")
                 x["Year"] = i
                 demand = demand._append(x)
         else:
-            path = DEMAND_PATH + "/{}/".format(self.scenario_code)
+            path = str(DEMAND_PATH) + f"/{self.scenario_code}/"
 
             # Iterate through all model years loading and appending demand.
-            demand = pd.read_csv("{path}vkm_by_speed_and_type_{self.index_year}_hgv.csv".format(**locals()))
+            demand = pd.read_csv(f"{path}vkm_by_speed_and_type_{self.index_year}_hgv.csv")
             demand["Year"] = self.index_year
             for i in range(2020, 2055, 5):
-                x = pd.read_csv("{path}vkm_by_speed_and_type_{i}_hgv.csv".format(**locals()))
+                x = pd.read_csv(f"{path}vkm_by_speed_and_type_{i}_hgv.csv")
                 x["Year"] = i
                 demand = demand._append(x)
 
@@ -176,23 +176,23 @@ class Scenario:
     def __load_lgv_demand(self):
         """Load the NoHAM lgv demand for a specified scenario."""
         if self.time_period:
-            path = DEMAND_PATH + "/{}/".format(self.scenario_code)
+            path = str(DEMAND_PATH) + f"/{self.scenario_code}/"
 
             # Iterate through all model years loading and appending demand.
-            demand = pd.read_csv("{path}vkm_by_speed_and_type_{self.index_year}_lgv_{self.time}.csv".format(**locals()))
+            demand = pd.read_csv(f"{path}vkm_by_speed_and_type_{self.index_year}_lgv_{self.time}.csv")
             demand["Year"] = self.index_year
             for i in range(2020, 2055, 5):
-                x = pd.read_csv("{path}vkm_by_speed_and_type_{i}_lgv_{self.time}.csv".format(**locals()))
+                x = pd.read_csv(f"{path}vkm_by_speed_and_type_{i}_lgv_{self.time}.csv")
                 x["Year"] = i
                 demand = demand._append(x)
         else:
-            path = DEMAND_PATH + "/{}/".format(self.scenario_code)
+            path = str(DEMAND_PATH) + f"/{self.scenario_code}/"
 
             # Iterate through all model years loading and appending demand.
-            demand = pd.read_csv("{path}vkm_by_speed_and_type_{self.index_year}_lgv.csv".format(**locals()))
+            demand = pd.read_csv(f"{path}vkm_by_speed_and_type_{self.index_year}_lgv.csv")
             demand["Year"] = self.index_year
             for i in range(2020, 2055, 5):
-                x = pd.read_csv("{path}vkm_by_speed_and_type_{i}_lgv.csv".format(**locals()))
+                x = pd.read_csv(f"{path}vkm_by_speed_and_type_{i}_lgv.csv")
                 x["Year"] = i
                 demand = demand._append(x)
             # Drop extra columns
@@ -201,8 +201,8 @@ class Scenario:
 
     def __load_demand(self, vehicle_type):
         """Load in and preprocess demand data for a given vehicle type."""
-        new_cols = ["zone", "road_type", "0_10", "10_30", "30_50", "50_70", "70_90", "90_110", "110_130", "total_vehicle_km", "year"]
-        original_cols = ["origin_zone", "road_type", "vkm_0-10_kph", "vkm_10-30_kph", "vkm_30-50_kph", "vkm_50-70_kph", "vkm_70-90_kph", "vkm_90-110_kph", "vkm_110-130_kph", "total_vehicle_km", "Year"]
+        new_cols = ["zone", "road_type", "10_30", "30_50", "50_70", "70_90", "90_110", "total_vehicle_km", "year"]
+        original_cols = ["origin_zone", "road_type", "vkm_10-30_kph", "vkm_30-50_kph", "vkm_50-70_kph", "vkm_70-90_kph", "vkm_90-110_kph", "total_vehicle_km", "year"]
         if vehicle_type == "car":
             demand = self.__load_car_demand()
         elif vehicle_type == "hgv":
@@ -216,13 +216,15 @@ class Scenario:
         # Rename columns so they are consistent across vehicle type
         rename_cols = dict(zip(original_cols, new_cols))
         demand = demand.rename(columns=rename_cols)
-        # Combine first 2 speed bands as speed Emissions Curves don't account for 1-10 kmph
-        demand["10_30"] = demand["10_30"] + demand["0_10"]
-        demand = demand.drop(columns=["0_10"])
+        demand = demand[["zone", "road_type", "year", "10_30", "30_50", "50_70", "70_90", "90_110", "total_vehicle_km",
+                         "vehicle_type", "km_growth"]]
         # Reshape demand to long form with distance travelled called "chainage"
         demand = pd.melt(demand, id_vars=["zone", "road_type", "total_vehicle_km", "vehicle_type", "year", "km_growth"],
                          var_name="speed_band",
                          value_name="chainage")
         demand["chainage"] = demand["chainage"] * demand["km_growth"]
         demand = demand.drop(columns=["total_vehicle_km", "km_growth"])
+        demand.loc[demand["road_type"] == "motorway", "road_type"] = "Motorway"
+        demand.loc[demand["road_type"] == "urban", "road_type"] = "Urban"
+        demand.loc[demand["road_type"] == "rural", "road_type"] = "Rural"
         return demand

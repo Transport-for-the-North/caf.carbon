@@ -26,7 +26,6 @@ class Model:
         self.invariant = invariant_obj
         self.scenario = scenario_obj
         self.date = datetime.today().strftime('%Y_%m_%d')
-        self.run_type = invariant_obj.run_type.lower()
         self.ev_redistribution = ev_redistribution
         self.region_filter = filter
         self.__predict_fleet_size()
@@ -158,7 +157,7 @@ class Model:
         print("\n\nProjecting fleet:")
         for i in range(self.invariant.index_year, 2050):
             fleet_df, current_year = self.__jump_forward(fleet_df, scrappage_df, fleet_sales_df, tally_df)
-            print("\r{0}".format(current_year), end="\r")
+            print(f"\r{current_year}", end="\r")
             if current_year % 5 == 0:
                 fleet_useful_years = fleet_useful_years._append(fleet_df).fillna(current_year)
 
@@ -173,7 +172,7 @@ class Model:
 
         if self.scenario.scenario_initials == "BAU":
             fleet_useful_years.to_csv(
-                f"{self.outpath}audit/projected_fleet_{self.run_type}_{self.date}.csv", index=False)
+                f"{self.outpath}/audit/projected_fleet_{self.date}.csv", index=False)
         print("\rProjection complete.\n")
 
         # Iterate through all model years loading and appending demand.
@@ -186,11 +185,9 @@ class Model:
         """Distribute the vehicle kms between fuel-segment-cohorts."""
         # Divide chainage by ANPR data, each cya is distributed part of the bodytype-roadtype chainage
         chainage = pd.merge(self.invariant.anpr, self.scenario.demand, how="left", on=["vehicle_type", "road_type"])
-
         chainage["chainage"] = chainage["chainage"] * chainage["cya_prop_of_bt_rt"]
         chainage = chainage.groupby(
             ["vehicle_type", "cya", "zone", "speed_band", "year"])["chainage"].sum().reset_index()
-
         self.projected_fleet["cya"] = self.projected_fleet["year"] - self.projected_fleet["cohort"]
         self.projected_fleet = ut.cya_column_to_group(self.projected_fleet)
 
@@ -201,13 +198,10 @@ class Model:
                                                   "tally"].transform("sum")
         self.projected_fleet = self.projected_fleet.merge(chainage, how="left", on=[
             "vehicle_type", "cya", "zone", "year"])
-
-        if self.run_type == "msoa":
-            self.projected_fleet = self.projected_fleet.merge(self.invariant.new_area_types[["zone", "msoa_area_type"]],
-                                                              how="left", on="zone")
-            self.projected_fleet = self.projected_fleet.merge(self.scenario.km_index_reductions, how="left",
-                                      on=["year", "vehicle_type", "msoa_area_type"])
-
+        self.projected_fleet = self.projected_fleet.merge(self.invariant.new_area_types[["zone", "msoa_area_type"]],
+                                                          how="left", on="zone")
+        self.projected_fleet = self.projected_fleet.merge(self.scenario.km_index_reductions, how="left",
+                                  on=["year", "vehicle_type", "msoa_area_type"])
         # Use tally share to distribute chainage
         self.projected_fleet["chainage"] = self.projected_fleet["chainage"] * \
                                            self.projected_fleet["prop_by_fuel_seg_cohort"]
@@ -289,9 +283,9 @@ class Model:
         self.projected_fleet["scenario"] = self.scenario.scenario_code
         if self.time_period:
             self.projected_fleet.to_csv(
-                "{self.outpath}{self.scenario.scenario_initials}"
-                "_fleet_emissions_{self.run_type}_{self.date}_{self.time}.csv".format(**locals()), index=False)
+                f"{self.outpath}/{self.scenario.scenario_initials}"
+                f"_fleet_emissions_{self.date}_{self.time}.csv", index=False)
         else:
             self.projected_fleet.to_csv(
-                "{self.outpath}{self.scenario.scenario_initials}"
-                "_fleet_emissions_{self.run_type}_{self.date}.csv".format(**locals()), index=False)
+                f"{self.outpath}/{self.scenario.scenario_initials}"
+                f"_fleet_emissions_{self.date}.csv", index=False)

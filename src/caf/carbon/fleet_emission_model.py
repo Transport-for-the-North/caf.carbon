@@ -19,7 +19,7 @@ class FleetEmissionsModel:
             time_period_list = ["aggregated"]
 
         # %% Scenario Agnostic
-        index_fleet = scenario_invariant.IndexFleet(OUT_PATH, run_fresh=True)
+        index_fleet = scenario_invariant.IndexFleet(run_fresh=True)
         invariant_data = scenario_invariant.Invariant(index_fleet, time_period)
 
         # State whether you want to generate baseline projections or decarbonization

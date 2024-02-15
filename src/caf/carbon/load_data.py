@@ -62,7 +62,7 @@ FUEL_SHARE = \
 
 DEMAND_PATH = \
     Path.cwd() / \
-    "CAFCarb" / "input" / "demand"
+    "CAFCarb" / "input" / "demand" / "TfSE"
 
 CAR_PATH = \
     Path.cwd() / \
@@ -70,22 +70,28 @@ CAR_PATH = \
 
 LGV_PATH = \
     Path.cwd() / \
-    "CAFCarb" / "fleet" / "Cars by LAD from 2003 - 200507.csv"
+    "CAFCarb" / "fleet" / "LGVs by LAD from 2003 - 200507.csv"
 
 HGV_PATH = \
     Path.cwd() / \
-    "CAFCarb" / "fleet" / "Cars by LAD from 2003 - 200507.csv"
+    "CAFCarb" / "fleet" / "Goods by LAD from 2003 - 200507.csv"
 
 # fleet emissions tool preprocessing data
 DEMAND_FACTORS = \
     Path.cwd() / \
     "CAFCarb" / "lookup" / "demand_factors.csv"
 
-LINK_DATA = \
+MSOA_RTM_TRANSLATION = \
     Path.cwd() / \
-    "CAFCarb" / "input" / "demand" / "link_data" / "2018" / "noham2018_lad21.csv"
+    "CAFCarb" / "lookup" / "SERTM_to_msoa11_spatial.csv"
 
-DEMAND_DATA = Path("G:") / "raw_data" / "4019 - road OD flows" / "Satpig" / "QCR"
+LINK_ROAD_TYPES = \
+    Path.cwd() / \
+    "CAFCarb" / "lookup" / "SE_link.csv"
+
+DEMAND_DATA = Path("O:/") / "26.RTM2" / "SERTM2" / "Assignment"
+
+LINK_DATA = Path("E:/") / "RTMs" / "SERTM2" / "Assignment"
 
 # vkm emissions tool data
 BATCHED_PROCESSING_FILE = \
