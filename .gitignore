@@ -5,6 +5,7 @@ postgres_normalisation.py
 output_figures.py
 hb_nhb_interpolation.py
 audit_tests.py
+Interpolator.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -18,6 +19,7 @@ __pycache__/
 *.csv
 *.xlsx
 *.pbz2
+*.docx
 
 # Distribution / packaging
 .Python
@@ -146,4 +148,4 @@ dmypy.json
 
 src/caf/carbon/2018/
 src/caf/carbon/functional analysis/
-examples/CAFCarb/
+CAFCarb/

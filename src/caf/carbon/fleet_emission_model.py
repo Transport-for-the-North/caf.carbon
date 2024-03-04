@@ -6,7 +6,8 @@ from caf.carbon.load_data import REGION_FILTER, OUT_PATH
 
 class FleetEmissionsModel:
     """Calculate fleet emissions from fleet and demand data."""
-    def __init__(self, regions, ev_redistribution, time_period, scenario_list):
+
+    def __init__(self, regions, ev_redistribution, time_period, scenario_list, run_fresh):
         # %% Load config file
         region_filter = pd.read_csv(REGION_FILTER)
         region_filter = region_filter[region_filter["region"].isin(regions)]
@@ -18,7 +19,7 @@ class FleetEmissionsModel:
             time_period_list = ["aggregated"]
 
         # %% Scenario Agnostic
-        index_fleet = scenario_invariant.IndexFleet(run_fresh=True)
+        index_fleet = scenario_invariant.IndexFleet(run_fresh)
         invariant_data = scenario_invariant.Invariant(index_fleet, time_period)
 
         # State whether you want to generate baseline projections or decarbonization
@@ -30,10 +31,17 @@ class FleetEmissionsModel:
                 print("\n\n\n###################")
                 print(i, time)
                 print("###################")
-                scenario = scenario_dependent.Scenario(region_filter, time_period, time, i,
-                                                       invariant_data, pathway)
-                model = projection.Model(time, time_period, region_filter, invariant_data, scenario,
-                                         ev_redistribution)
+                scenario = scenario_dependent.Scenario(
+                    region_filter, time_period, time, i, invariant_data, pathway
+                )
+                model = projection.Model(
+                    time,
+                    time_period,
+                    region_filter,
+                    invariant_data,
+                    scenario,
+                    ev_redistribution,
+                )
                 model.allocate_chainage()
                 model.predict_emissions()
                 model.save_output()
@@ -42,9 +50,8 @@ class FleetEmissionsModel:
         if not time_period:
             generate_outputs = False
             if generate_outputs:
-                summary_outputs = output_figures.SummaryOutputs(time_period_list,
-                                                                pathway,
-                                                                invariant_data,
-                                                                model)
+                summary_outputs = output_figures.SummaryOutputs(
+                    time_period_list, pathway, invariant_data, model
+                )
                 summary_outputs.plot_effects()
                 summary_outputs.plot_fleet()
