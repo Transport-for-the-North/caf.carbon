@@ -6,9 +6,9 @@ import numpy as np
 from caf.carbon import utility as ut
 from caf.carbon.load_data import (
     OUT_PATH,
-    CAR_PATH,
-    LGV_PATH,
-    HGV_PATH,
+    VEHICLE_PATH,
+    POSTCODE_MSOA,
+    DVLA_BODY,
     MSOA_BODY,
     MSOA_LAD,
     NOHAM_TO_MSOA,
@@ -52,13 +52,13 @@ class Imputation:
     def fill_with_mice(fleet_df):
         """Use MICE to impute vehicle characteristics."""
         fleet_df = fleet_df.copy()
-        impute_df = fleet_df[["avg_co2", "avg_mass", "avg_es", "segment", "cya", "fuel"]]
+        impute_df = fleet_df[["avg_co2", "avg_mass", "avg_cc", "segment", "cya", "fuel"]]
         impute_df = pd.get_dummies(impute_df)
         impute_matrix = impute.IterativeImputer(random_state=0).fit_transform(impute_df)
         impute_df[:] = impute_matrix
         # Integrate values back into the dataframe
-        fleet_df[["avg_co2", "avg_mass", "avg_es"]] = impute_df[
-            ["avg_co2", "avg_mass", "avg_es"]
+        fleet_df[["avg_co2", "avg_mass", "avg_cc"]] = impute_df[
+            ["avg_co2", "avg_mass", "avg_cc"]
         ].astype("float")
         return fleet_df
 
@@ -69,11 +69,13 @@ class Imputation:
         reduced_fleet_df = fleet_df.loc[
             fleet_df["vehicle_type"] == vehicle_type, ["segment", "avg_mass"]
         ]
+        print(reduced_fleet_df["avg_mass"])
+
         if vehicle_type == "car":
             # Use the 25th percentile of mass for each car segment as the bin boundaries.
             mass_quantiles = reduced_fleet_df.groupby("segment")["avg_mass"].quantile(0.25)
             mass_quantiles = (
-                mass_quantiles.drop("unknown")
+                mass_quantiles  # .drop("unknown")
                 .sort_values(ascending=False)
                 .reset_index(level=0)
             )
@@ -288,12 +290,12 @@ class IndexFleet:
         """
         self.outpath = OUT_PATH
         if run_fresh:
-            self.index_year = 2018
+            self.fleet_index_year = 2023
             self.__load_fleet()
             self.__basic_clean()
             self.__advanced_clean()
             self.__split_tables()
-            self.__map_zones()
+            # self.__map_zones() # TODO: likely unneccesary, check
         else:
             self.fleet_archive = pd.read_csv(f"{self.outpath}/audit/fleet_archive.csv")
             self.fleet = pd.read_csv(f"{self.outpath}/audit/index_fleet.csv")
@@ -301,33 +303,40 @@ class IndexFleet:
 
     def __load_fleet(self):
         """Read in the DfT fleet data for cars, vans and HGVs and concetenate."""
+        # TODO: add fuel and fleet conversions, complete postcode to msoa translation
+        fleet_archive = pd.read_csv(VEHICLE_PATH)
+        fleet_archive = fleet_archive.rename(columns={"Post_Code_Current": "Postcode",
+                                                      "Records": "Tally",
+                                                      "Fuel Type": "Fuel",
+                                                      "Body Type Text": "BodyTypeText",
+                                                      "Vehicle_Type": "VehicleType"})
 
-        def read_fleet(vehicle_type):
-            """Read in and preprocess DfT fleet data for a given vehicle type."""
-            if vehicle_type == "car":
-                table_df = pd.read_csv(CAR_PATH)
-            elif vehicle_type == "lgv":
-                table_df = pd.read_csv(LGV_PATH)
-            else:
-                table_df = pd.read_csv(HGV_PATH)
-            table_df["VehicleType"] = vehicle_type
-
-            # Rename columns
-            table_df.columns = [
-                i if "Euro" not in i else "EuroStandard" for i in table_df.columns
-            ]
-            table_df.columns = [
-                i if not any(z in i for z in ["MSOA", "LAD"]) else "Zone"
-                for i in table_df.columns
-            ]
-            table_df = table_df.rename(columns={"Bodytype": "Segment", "Number": "Tally"})
-            return table_df
-
-        car = read_fleet("car")
-        lgv = read_fleet("lgv")
-        hgv = read_fleet("hgv")
-        fleet_archive = pd.concat([car, lgv, hgv], ignore_index=True)
-        fleet_archive = fleet_archive.drop(columns="Keeper")
+        postcode_to_msoa = pd.read_csv(POSTCODE_MSOA, usecols=["Postcode", "MSOA Code"]
+                                       ).rename(columns={"MSOA Code": "Zone"})
+        postcode_to_msoa["Postcode"] = postcode_to_msoa["Postcode"].str.replace(" ", "")
+        fleet_archive = fleet_archive.merge(postcode_to_msoa, on="Postcode", how="left")
+        fleet_archive = fleet_archive.drop(columns=["Postcode", "LSOA11NM", "Gross_Weight"])
+        fleet_archive["Fuel"] = (
+            fleet_archive["Fuel"]
+            .replace(
+                {
+                    "Diesel/ Heavy oil": "diesel",
+                    "Electric": "bev",
+                    "Electric/ Diesel": "diesel",
+                    "Electric/ Petrol": "phev",
+                    "Gas": "diesel",
+                    "Gas/Diesel": "diesel",
+                    "Gas/Petrol": "diesel",
+                    "Petrol": "petrol",
+                }
+            )
+        )
+        fleet_archive = fleet_archive[
+            fleet_archive["Fuel"].isin(["diesel", "petrol", "phev", "bev", "hybrid", "hyrdogen", "petrol hybrid"])]
+        # make sure the other random fuel types are filtered/out replaced
+        fleet_archive = fleet_archive[
+            fleet_archive["VehicleType"].isin(["Car", "Goods"])]
+        fleet_archive = fleet_archive.drop(columns=["Keeper", "VehicleType"])
         self.fleet_archive = ut.camel_columns_to_snake(fleet_archive)
 
     def __basic_clean(self):
@@ -340,40 +349,42 @@ class IndexFleet:
         fleet_archive = self.fleet_archive.copy()
         fleet_archive = fleet_archive[fleet_archive["tally"] > 0]
         fleet_archive["fuel"] = fleet_archive["fuel"].str.lower().fillna("diesel")
-        fleet_archive["segment"] = (
-            fleet_archive["segment"]
-            .str.lower()
-            .fillna("unknown")
-            .replace(
-                {
-                    "super mini": "small",
-                    "n1 class i/ii": "n1 class ii",
-                    "n1 class ii/iii": "n1 class iii",
-                }
-            )
-        )
+        fleet_archive = fleet_archive[
+            fleet_archive["fuel"].isin(["diesel", "petrol", "phev", "bev", "hybrid", "hydrogen", "petrol hybrid"])]
+        fleet_segmentation = pd.read_csv(DVLA_BODY)
+        # fleet_archive = fleet_archive.loc[(
+        #                                       fleet_archive["body_type_text"].isin(fleet_segmentation["body_type_text"]))
+        #                                   & (fleet_archive["wheelplan_text"].isin(fleet_segmentation["wheelplan_text"]))
+        #                                   ].reset_index(drop=True)
+        fleet_archive = fleet_archive.merge(fleet_segmentation, how="left", on=["body_type_text", "wheelplan_text"])
+        fleet_archive = fleet_archive.drop(columns=["wheelplan_text", "body_type_text"])
         fleet_archive = fleet_archive[~fleet_archive["zone"].isin(["zzDisposal", "zzUnknown"])]
         fleet_archive = fleet_archive[~fleet_archive["fuel"].isin(["other"])]
-
+        fleet_archive["segment"] = fleet_archive["segment"].fillna("Unknown")
         # Convert hev cars to petrol hybrids
-        fleet_archive.loc[
-            (fleet_archive["vehicle_type"] == "car") & (fleet_archive["fuel"] == "hev"), "fuel"
-        ] = "petrol hybrid"
+        # fleet_archive.loc[
+        #     (fleet_archive["vehicle_type"] == "car") & (fleet_archive["fuel"] == "hev"), "fuel"
+        # ] = "petrol hybrid"
         # Convert HEV/PHEV non-cars to BEVs
         fleet_archive.loc[
             (fleet_archive["vehicle_type"].isin(["hgv", "lgv"]))
             & (fleet_archive["fuel"].isin(["hev", "phev"])),
             "fuel",
         ] = "bev"
-
         # Determine missing CYA from eurostandard and vehicle type
-        fleet_archive = ut.determine_from_similar(
-            fleet_archive,
-            shared_qualities=["year", "vehicle_type", "euro_standard"],
-            missing_quality="cya",
-            value_to_distribute="tally",
-        )
-        fleet_archive = fleet_archive.drop(columns=["euro_standard"])
+        # fleet_archive = ut.determine_from_similar(
+        #     fleet_archive,
+        #     shared_qualities=["year", "vehicle_type", "euro_standard"],
+        #     missing_quality="cya",
+        #     value_to_distribute="tally",
+        # )
+        fleet_archive["cya"] = self.fleet_index_year
+        fleet_archive["cya"] = fleet_archive["cya"] - fleet_archive["year"]
+        fleet_archive["year"] = self.fleet_index_year
+
+        fleet_archive = fleet_archive.groupby(["zone", "fuel", "segment",
+                                               "vehicle_type", "cya", "year",
+                                               "avg_mass", "avg_cc", "avg_co2"], as_index=False).sum()
 
         fleet_archive = ut.cya_group_to_list(fleet_archive)
         # Merge vehicles with identical attributes
@@ -389,8 +400,9 @@ class IndexFleet:
         - Reduce to index year.
         - Impute segments and emission characteristics.
         """
-        print("Index year:", self.index_year)
-        fleet_df = self.fleet_archive.loc[self.fleet_archive["year"] == int(self.index_year)]
+        print("Index year:", self.fleet_index_year)
+        fleet_df = self.fleet_archive.copy()
+        # fleet_df = self.fleet_archive.loc[self.fleet_archive["year"] == int(self.fleet_index_year)]
         # Segmentation
         fleet_df = Imputation.segment_by_mass(fleet_df, "car")
         fleet_df = Imputation.segment_by_mass(fleet_df, "lgv")
@@ -404,13 +416,13 @@ class IndexFleet:
         # Imputation
         fleet_df = Imputation.fill_with_mean(fleet_df, "avg_mass")
         fleet_df = Imputation.fill_with_mean(fleet_df, "avg_co2")
-        fleet_df = Imputation.fill_with_mean(fleet_df, "avg_es")
+        fleet_df = Imputation.fill_with_mean(fleet_df, "avg_cc")
         self.fleet = Imputation.fill_with_mice(fleet_df)
 
     def __split_tables(self):
         """Split table into fleet only and emission characteristics only."""
         fleet_df = self.fleet.copy()
-        fleet_df = ut.cya_list_to_column(fleet_df, shared_value="tally")
+        # fleet_df = ut.cya_list_to_column(fleet_df, shared_value="tally")
         fleet_df["cohort"] = fleet_df["year"] - fleet_df["cya"]
         fleet_df = fleet_df.drop(columns="cya")
 
@@ -420,14 +432,14 @@ class IndexFleet:
             vehicle_characteristics,
             grouping_var_list=["cohort", "vehicle_type", "segment", "fuel"],
             weight_var="tally",
-            mean_var_list=["avg_co2", "avg_mass", "avg_es"],
+            mean_var_list=["avg_co2", "avg_mass", "avg_cc"],
         )
         # Reduce and store emission characteristics data
         vehicle_characteristics = vehicle_characteristics.drop(["tally"], axis=1)
         self.characteristics = vehicle_characteristics.drop_duplicates()
 
         # Reduce and store index fleet data
-        fleet_df = fleet_df.drop(columns=["avg_co2", "avg_es", "avg_mass"])
+        fleet_df = fleet_df.drop(columns=["avg_co2", "avg_cc", "avg_mass"])
         self.fleet = (
             fleet_df.groupby(ut.all_but(fleet_df, "tally"))["tally"].sum().reset_index()
         )

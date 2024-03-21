@@ -9,6 +9,10 @@ data_path = Path.cwd()
 # fleet emissions tool data
 REGION_FILTER = Path("E:/") / "GitHub" / "caf.carbon" / "CAFCarb" / "lookup" / "msoa_region.csv"
 
+POSTCODE_MSOA = Path("E:/") / "GitHub" / "caf.carbon" / "CAFCarb" / "lookup" / "postcodes.csv"
+
+DVLA_BODY = Path("E:/") / "GitHub" / "caf.carbon" / "CAFCarb" / "lookup" / "DVLA_body_type_look_up.csv"
+
 MSOA_BODY = Path("E:/") / "GitHub" / "caf.carbon" / "CAFCarb" / "lookup" / "Bodytype by MSOA - 200507.csv"
 
 MSOA_LAD = Path("E:/") / "GitHub" / "caf.carbon" / "CAFCarb" / "lookup" / "MSOA_LAD_lookup.csv"
@@ -37,13 +41,15 @@ SEG_SHARE = Path("E:/") / "GitHub" / "caf.carbon" / "CAFCarb" / "input" / "seg_p
 
 FUEL_SHARE = Path("E:/") / "GitHub" / "caf.carbon" / "CAFCarb" / "input" / "fuel_prop_segment_2015.csv"
 
-DEMAND_PATH = Path("E:/") / "GitHub" / "caf.carbon" / "CAFCarb" / "input" / "demand" / "MC"
+DEMAND_PATH = Path("E:/") / "GitHub" / "caf.carbon" / "CAFCarb" / "input" / "demand" / "TfN"
 
 CAR_PATH = Path("E:/") / "GitHub" / "caf.carbon" / "CAFCarb" / "fleet" / "Cars by LAD from 2003 - 200507.csv"
 
 LGV_PATH = Path("E:/") / "GitHub" / "caf.carbon" / "CAFCarb" / "fleet" / "LGVs by LAD from 2003 - 200507.csv"
 
 HGV_PATH = Path("E:/") / "GitHub" / "caf.carbon" / "CAFCarb" / "fleet" / "Goods by LAD from 2003 - 200507.csv"
+
+VEHICLE_PATH = Path("E:/") / "GitHub" / "caf.carbon" / "CAFCarb" / "fleet" / "TFN Data Feb 24" / "TFNScan_Feb24.csv"
 
 # fleet emissions tool preprocessing data
 DEMAND_FACTORS = Path("E:/") / "GitHub" / "caf.carbon" / "CAFCarb" / "lookup" / "demand_factors.csv"

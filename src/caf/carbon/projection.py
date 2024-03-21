@@ -12,7 +12,7 @@ class Model:
     """Predict emissions using emissions, demand and projected fleet data."""
 
     def __init__(
-        self, time, time_period, region_filter, invariant_obj, scenario_obj, ev_redistribution
+        self, time, time_period, region_filter, invariant_obj, scenario_obj, ev_redistribution, run_name
     ):
         """Initialise functions and set class variables.
 
@@ -25,6 +25,7 @@ class Model:
         """
         self.outpath = OUT_PATH
         self.time = time
+        self.run_name = run_name
         self.time_period = time_period
         self.invariant = invariant_obj
         self.scenario = scenario_obj
@@ -47,9 +48,6 @@ class Model:
         Returns a df by vehicle type and tally.
         """
         fleet_size = self.invariant.index_fleet.fleet.copy()
-        # fleet_size = fleet_size.loc[
-        #     fleet_size["zone"].isin(self.region_filter["msoa11_id"])
-        # ].reset_index(drop=True)
         fleet_size = fleet_size.groupby("vehicle_type")["tally"].sum().reset_index()
         fleet_size = fleet_size.merge(
             self.scenario.type_fleet_size_growth, how="left", on="vehicle_type"
@@ -201,6 +199,9 @@ class Model:
             )
         print("\rProjection complete.\n")
         # Iterate through all model years loading and appending demand.
+        self.projected_fleet = self.projected_fleet.loc[
+            self.projected_fleet["zone"].isin(self.region_filter["msoa11_id"])
+        ].reset_index(drop=True)
         return self.projected_fleet
 
     ##########
@@ -369,13 +370,13 @@ class Model:
         self.projected_fleet["scenario"] = self.scenario.scenario_code
         if self.time_period:
             self.projected_fleet.to_csv(
-                f"{self.outpath}/{self.scenario.scenario_initials}"
+                f"{self.outpath}/{self.run_name}_{self.scenario.scenario_initials}"
                 f"_fleet_emissions_{self.date}_{self.time}.csv",
                 index=False,
             )
         else:
             self.projected_fleet.to_csv(
-                f"{self.outpath}/{self.scenario.scenario_initials}"
+                f"{self.outpath}/{self.run_name}_{self.scenario.scenario_initials}"
                 f"_fleet_emissions_{self.date}.csv",
                 index=False,
             )

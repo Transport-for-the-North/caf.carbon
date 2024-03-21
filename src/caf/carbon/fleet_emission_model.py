@@ -7,7 +7,7 @@ from caf.carbon.load_data import REGION_FILTER, OUT_PATH
 class FleetEmissionsModel:
     """Calculate fleet emissions from fleet and demand data."""
 
-    def __init__(self, regions, ev_redistribution, time_period, scenario_list, run_fresh):
+    def __init__(self, regions, ev_redistribution, time_period, scenario_list, run_fresh, run_name):
         # %% Load config file
         region_filter = pd.read_csv(REGION_FILTER)
         region_filter = region_filter[region_filter["region"].isin(regions)]
@@ -20,6 +20,7 @@ class FleetEmissionsModel:
 
         # %% Scenario Agnostic
         index_fleet = scenario_invariant.IndexFleet(run_fresh)
+        index_fleet.fleet.to_csv("index fleet new.csv")
         invariant_data = scenario_invariant.Invariant(index_fleet, time_period)
 
         # State whether you want to generate baseline projections or decarbonization
@@ -41,6 +42,7 @@ class FleetEmissionsModel:
                     invariant_data,
                     scenario,
                     ev_redistribution,
+                    run_name
                 )
                 model.allocate_chainage()
                 model.predict_emissions()
