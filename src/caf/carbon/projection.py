@@ -3,16 +3,16 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 
-from caf.carbon import utility as ut
-from caf.carbon import fleet_redistribution
-from caf.carbon.load_data import OUT_PATH
+from src.caf.carbon import utility as ut
+from src.caf.carbon import fleet_redistribution
+from src.caf.carbon.load_data import OUT_PATH
 
 
 class Model:
     """Predict emissions using emissions, demand and projected fleet data."""
 
     def __init__(
-        self, time, time_period, region_filter, invariant_obj, scenario_obj, ev_redistribution, run_name
+        self, region_filter, invariant_obj, scenario_obj, ev_redistribution, run_name
     ):
         """Initialise functions and set class variables.
 
@@ -24,9 +24,7 @@ class Model:
             Includes scenario tables.
         """
         self.outpath = OUT_PATH
-        self.time = time
         self.run_name = run_name
-        self.time_period = time_period
         self.invariant = invariant_obj
         self.scenario = scenario_obj
         self.date = datetime.today().strftime("%Y_%m_%d")
@@ -152,7 +150,7 @@ class Model:
             new_cohort = new_cohort[new_cohort["cohort"] == current_year]
             # zone fuel segment sales = zone fuel segment share of type sales * type sales
             new_cohort["tally"] = new_cohort["sales_share"] * new_cohort["deficit"]
-            fleet_df = fleet_df.append(
+            fleet_df = fleet_df._append(
                 new_cohort[["fuel", "segment", "cohort", "zone", "vehicle_type", "tally"]]
             )
             return fleet_df
@@ -181,7 +179,7 @@ class Model:
             )
             print(f"\r{current_year}", end="\r")
             if current_year % 5 == 0:
-                fleet_useful_years = fleet_useful_years.append(fleet_df).fillna(current_year)
+                fleet_useful_years = fleet_useful_years._append(fleet_df).fillna(current_year)
 
         fleet_useful_years = fleet_useful_years[fleet_useful_years["tally"] > 0]
 
@@ -368,15 +366,8 @@ class Model:
     def save_output(self):
         """Save the final output (fleet + chainage + emissions)."""
         self.projected_fleet["scenario"] = self.scenario.scenario_code
-        if self.time_period:
-            self.projected_fleet.to_csv(
-                f"{self.outpath}/{self.run_name}_{self.scenario.scenario_initials}"
-                f"_fleet_emissions_{self.date}_{self.time}.csv",
-                index=False,
-            )
-        else:
-            self.projected_fleet.to_csv(
-                f"{self.outpath}/{self.run_name}_{self.scenario.scenario_initials}"
-                f"_fleet_emissions_{self.date}.csv",
-                index=False,
-            )
+        self.projected_fleet.to_csv(
+            f"{self.outpath}/{self.run_name}_{self.scenario.scenario_initials}"
+            f"_fleet_emissions_{self.date}.csv",
+            index=False,
+        )

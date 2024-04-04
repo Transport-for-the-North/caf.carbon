@@ -6,15 +6,15 @@ import configparser as cf
 import pandas as pd
 import numpy as np
 
-from caf.carbon import utility as ut
+from src.caf.carbon import utility as ut
 
-from caf.carbon.load_data import OUT_PATH, NOHAM_AREA_TYPE, NOHAM_TO_MSOA, TARGET_AREA_TYPE
+from src.caf.carbon.load_data import OUT_PATH, NOHAM_AREA_TYPE, NOHAM_TO_MSOA, TARGET_AREA_TYPE
 
 
 class SummaryOutputs:
     """Combine scenario outputs and transform into summary outputs."""
 
-    def __init__(self, time_period_list, pathway, invariant_obj, scenario_obj):
+    def __init__(self, pathway, invariant_obj, scenario_obj):
         """
         
         Parameters
