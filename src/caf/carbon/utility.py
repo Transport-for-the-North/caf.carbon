@@ -1,48 +1,12 @@
-import dataclasses
 import re
 import configparser as cf
 import pandas as pd
+
+
 from pandas import DataFrame
-from openpyxl import load_workbook
 
 from src.caf.carbon import audit_tests as at
 from src.caf.carbon.load_data import GENERAL_TABLES_PATH, SCENARIO_TABLES_PATH
-
-
-# class GeneralTables:
-#     def __init__(self):
-#         self.file_path = GENERAL_TABLES_PATH
-#         self.wb = self.load_workbook()
-#
-#     def load_workbook(self):
-#         try:
-#             wb = load_workbook(filename=self.file_path, read_only=True)
-#             return wb
-#         except FileNotFoundError:
-#             print(f"File '{self.file_path}' not found.")
-#             return None
-#
-#     def load_table(self, sheet_name):
-#         print(f"loading table>>> {sheet_name}")
-#
-#         if sheet_name in self.wb.sheetnames:
-#             sheet = self.wb[sheet_name]
-#
-#             data = sheet.values
-#             columns = next(data)
-#             table = pd.DataFrame(data, columns=columns).dropna()
-
-
-# class ScenarioTables:
-#     def __init__(self):
-#         self.file_path = SCENARIO_TABLES_PATH
-#         self.wb = self.load_workbook()
-#
-#     def load_table(self, table_name):
-#         print(f"loading table>>> {table_name}")
-
-
-
 
 # %% Helper functions
 def if_string_then_list(string_or_list):
@@ -122,53 +86,7 @@ def new_load_scenario_tables(scenario: str, table_name: str) -> pd.DataFrame:
 
     return table
 
-
-# def load_table(self, table_name, table_type=None, suffix="File"):
-#     """Load table from an Excel sheet containing multiple tables.
-#
-#     Path, sheet and position are loaded from the config.txt settings.
-#     """
-#     config = cf.ConfigParser(interpolation=cf.ExtendedInterpolation())
-#     config.read("config_local.txt")
-#
-#     if table_type is None:
-#         table_type = self.type
-#         header_row = 1
-#     elif table_type == "gridCo2":
-#         header_row = 2
-#     if suffix in ["None", ""]:
-#         suffix = "File"
-#
-#     if "filePaths" not in config:
-#         print("Error: 'filePaths' section not found in the configuration file.")
-#         # Handle the error appropriately, such as exiting the function or raising an exception
-#     else:
-#         # Check if the expected keys exist within the 'filePaths' section
-#         if table_type + suffix not in config["filePaths"]:
-#             print(f"Error: Key '{table_type + suffix}' not found in the 'filePaths' section.")
-#             # Handle the error appropriately
-#         else:
-#             # Access the file path
-#             file_path = config["filePaths"][table_type + suffix]
-#             # Continue with the rest of your code
-
-
-    file_path = config["filePaths"][table_type + suffix]
-    # # pylint: disable-all
-    # table = pd.read_excel(
-    #     io=file_path,
-    #     sheet_name=self.scenario_name,
-    #     usecols=config["fileStructure"][table_name],
-    #     header=header_row,
-    # ).dropna()
-    # # pylint: enable-all
-    # # Remove column suffixes (e.g. second 2018 column is called 2018.2)
-    # table = table.rename(columns=lambda x: re.sub(r"\.[0-9]$", "", str(x)))
-    # table = camel_columns_to_snake(table)
-    # at.describe_table(table_name, table, file_path)
-    # return table
-
-
+# TODO(JC) change the way this is loaded in
 def load_csv(self, table_name):
     """Load table from a csv with only one table.
 
