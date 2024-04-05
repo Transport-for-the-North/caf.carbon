@@ -1,15 +1,18 @@
-import pandas as pd
-from src.caf.carbon import utility as ut
+# Built-Ins
 import configparser as cf
-from src.caf.carbon.load_data import SEG_SHARE, FUEL_SHARE, DEMAND_PATH
+
+# Third Party
+import pandas as pd
+
+# Local Imports
+from src.caf.carbon import utility as ut
+from src.caf.carbon.load_data import DEMAND_PATH
 
 
 class Scenario:
     """Load in and preprocess scenario variant tables."""
 
-    def __init__(
-        self, region_filter, scenario_name, invariant_obj, pathway="none"
-    ):
+    def __init__(self, region_filter, scenario_name, invariant_obj, pathway="none"):
         """Initialise functions and set class variables.
 
         Parameters
@@ -38,18 +41,23 @@ class Scenario:
             "Business As Usual Core": "BAU",
             "Accelerated EV Core": "AE",
         }[self.scenario_name]
-        self.scenario_code = {
-            "BAU": "SC01",
-            "AE": "SC02"
-        }[self.scenario_initials]
+        self.scenario_code = {"BAU": "SC01", "AE": "SC02"}[self.scenario_initials]
 
     def __load_scenario(self, pathway="none"):
         """Load in scenario tables."""
-        self.seg_share_of_year_type_sales = ut.new_load_scenario_tables(self.scenario_name, "segSales_propOfTypeYear")
-        self.fuel_share_of_year_seg_sales = ut.new_load_scenario_tables(self.scenario_name, "fuelSales_propOfSegYear")
-        self.type_fleet_size_growth = ut.new_load_scenario_tables(self.scenario_name, "fleetSize_totOfYear")
+        self.seg_share_of_year_type_sales = ut.new_load_scenario_tables(
+            self.scenario_name, "segSales_propOfTypeYear"
+        )
+        self.fuel_share_of_year_seg_sales = ut.new_load_scenario_tables(
+            self.scenario_name, "fuelSales_propOfSegYear"
+        )
+        self.type_fleet_size_growth = ut.new_load_scenario_tables(
+            self.scenario_name, "fleetSize_totOfYear"
+        )
         self.co2_reductions = ut.new_load_scenario_tables(self.scenario_name, "co2Reduction")
-        self.km_index_reductions = ut.new_load_scenario_tables(self.scenario_name, "ChainageReduction")
+        self.km_index_reductions = ut.new_load_scenario_tables(
+            self.scenario_name, "ChainageReduction"
+        )
 
         # # File paths are different if the index year is 2015
         # # Carry out some preprocessing so the tables are consistent with 2018 inputs

@@ -1,12 +1,15 @@
-import re
+# Built-Ins
 import configparser as cf
+import re
+
+# Third Party
 import pandas as pd
-
-
 from pandas import DataFrame
 
+# Local Imports
 from src.caf.carbon import audit_tests as at
 from src.caf.carbon.load_data import GENERAL_TABLES_PATH, SCENARIO_TABLES_PATH
+
 
 # %% Helper functions
 def if_string_then_list(string_or_list):
@@ -44,16 +47,17 @@ def group_to_list_string(start, end):
     cya_list = list(range(start, end + 1))
     return ",".join(map(str, cya_list))
 
+
 def new_load_general_table(sheet_name: str) -> pd.DataFrame:
-    """ Load tables from Excel sheets. Remove the config.txt method and access the sheets into a df directly """
+    """Load tables from Excel sheets. Remove the config.txt method and access the sheets into a df directly"""
     if sheet_name in ["gridConsumption", "gridCarbonIntensity"]:
         header_row = 2
     else:
         header_row = 0
 
-    table = pd.read_excel(io=GENERAL_TABLES_PATH,
-                          sheet_name=sheet_name,
-                          header=header_row).dropna()
+    table = pd.read_excel(
+        io=GENERAL_TABLES_PATH, sheet_name=sheet_name, header=header_row
+    ).dropna()
 
     # pylint: enable-all
     # Remove column suffixes (e.g. second 2018 column is called 2018.2)
@@ -63,28 +67,28 @@ def new_load_general_table(sheet_name: str) -> pd.DataFrame:
 
 
 def new_load_scenario_tables(scenario: str, table_name: str) -> pd.DataFrame:
-    """ Load scenario tables from inputs folder """
+    """Load scenario tables from inputs folder"""
     # TODO(JC): - update in future
     table_ranges = {
-        'segSales_propOfTypeYear': 'A:H',
-        'fuelSales_propOfSegYear': 'J:R',
-        'fleetSize_totOfYear': 'T:Z',
-        'ptEmissionReduction': 'AB:AH',
-        'co2Reduction': 'AJ:AL',
-        'ChainageReduction': 'AN:AU'
+        "segSales_propOfTypeYear": "A:H",
+        "fuelSales_propOfSegYear": "J:R",
+        "fleetSize_totOfYear": "T:Z",
+        "ptEmissionReduction": "AB:AH",
+        "co2Reduction": "AJ:AL",
+        "ChainageReduction": "AN:AU",
     }
 
     use_cols = table_ranges[table_name]
 
-    table = pd.read_excel(io=SCENARIO_TABLES_PATH,
-                          sheet_name=scenario,
-                          usecols=use_cols,
-                          header=1).dropna()
+    table = pd.read_excel(
+        io=SCENARIO_TABLES_PATH, sheet_name=scenario, usecols=use_cols, header=1
+    ).dropna()
 
     table = table.rename(columns=lambda x: re.sub(r"\.[0-9]$", "", str(x)))
     table = camel_columns_to_snake(table)
 
     return table
+
 
 # TODO(JC) change the way this is loaded in
 def load_csv(self, table_name):
@@ -316,9 +320,11 @@ def interpolate_timeline(table_df, grouping_vars, value_var, melt=True):
     """
     if melt:
         if value_var == "segment_sales_distribution":
-            table_df.rename(columns={'Segment': 'segment'}, inplace=True) # Rename column
+            table_df.rename(columns={"Segment": "segment"}, inplace=True)  # Rename column
         if value_var == "segment_fuel_sales_distribution":
-            table_df.rename(columns={'Segment': 'segment', 'Fuel': 'fuel'}, inplace=True)  # Rename column
+            table_df.rename(
+                columns={"Segment": "segment", "Fuel": "fuel"}, inplace=True
+            )  # Rename column
 
         table_df = pd.melt(
             table_df, id_vars=grouping_vars, var_name="year", value_name=value_var

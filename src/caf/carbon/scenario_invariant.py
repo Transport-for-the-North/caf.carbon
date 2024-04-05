@@ -1,21 +1,23 @@
+# Third Party
+import numpy as np
+import pandas as pd
 from sklearn import impute
 from sklearn.experimental import enable_iterative_imputer
 
-import pandas as pd
-import numpy as np
+# Local Imports
 from src.caf.carbon import utility as ut
 from src.caf.carbon.load_data import (
-    OUT_PATH,
-    VEHICLE_PATH,
-    POSTCODE_MSOA,
+    ANPR_DATA,
+    DEMAND_PATH,
     DVLA_BODY,
+    MSOA_AREA_TYPE,
     MSOA_BODY,
     MSOA_LAD,
     NOHAM_TO_MSOA,
-    MSOA_AREA_TYPE,
+    OUT_PATH,
+    POSTCODE_MSOA,
     TARGET_AREA_TYPE,
-    DEMAND_PATH,
-    ANPR_DATA,
+    VEHICLE_PATH,
 )
 
 
@@ -73,11 +75,9 @@ class Imputation:
         if vehicle_type == "car":
             # Use the 25th percentile of mass for each car segment as the bin boundaries.
             mass_quantiles = reduced_fleet_df.groupby("segment")["avg_mass"].quantile(0.25)
-            mass_quantiles = (
-                mass_quantiles  # .drop("unknown")
-                .sort_values(ascending=False)
-                .reset_index(level=0)
-            )
+            mass_quantiles = mass_quantiles.sort_values(  # .drop("unknown")
+                ascending=False
+            ).reset_index(level=0)
             mass_quantiles = mass_quantiles.iloc[::-1]
             mass_labels = mass_quantiles["segment"].tolist()
             mass_quantiles.iloc[0, mass_quantiles.columns.get_loc("avg_mass")] = 0
@@ -306,38 +306,42 @@ class IndexFleet:
         """Read in the DfT fleet data for cars, vans and HGVs and concetenate."""
         # TODO: add fuel and fleet conversions
         fleet_archive = pd.read_csv(VEHICLE_PATH)
-        fleet_archive = fleet_archive.rename(columns={"Post_Code_Current": "Postcode",
-                                                      "Records": "Tally",
-                                                      "Fuel Type": "Fuel",
-                                                      "Body Type Text": "BodyTypeText",
-                                                      "Vehicle_Type": "VehicleType",
-                                                      "AvgCC": "AvgES"})
+        fleet_archive = fleet_archive.rename(
+            columns={
+                "Post_Code_Current": "Postcode",
+                "Records": "Tally",
+                "Fuel Type": "Fuel",
+                "Body Type Text": "BodyTypeText",
+                "Vehicle_Type": "VehicleType",
+                "AvgCC": "AvgES",
+            }
+        )
 
-        postcode_to_msoa = pd.read_csv(POSTCODE_MSOA, usecols=["Postcode", "MSOA Code"]
-                                       ).rename(columns={"MSOA Code": "Zone"})
+        postcode_to_msoa = pd.read_csv(
+            POSTCODE_MSOA, usecols=["Postcode", "MSOA Code"]
+        ).rename(columns={"MSOA Code": "Zone"})
         postcode_to_msoa["Postcode"] = postcode_to_msoa["Postcode"].str.replace(" ", "")
         fleet_archive = fleet_archive.merge(postcode_to_msoa, on="Postcode", how="left")
         fleet_archive = fleet_archive.drop(columns=["Postcode", "LSOA11NM", "Gross_Weight"])
-        fleet_archive["Fuel"] = (
-            fleet_archive["Fuel"]
-            .replace(
-                {
-                    "Diesel/ Heavy oil": "diesel",
-                    "Electric": "bev",
-                    "Electric/ Diesel": "diesel",
-                    "Electric/ Petrol": "phev",
-                    "Gas": "diesel",
-                    "Gas/Diesel": "diesel",
-                    "Gas/Petrol": "diesel",
-                    "Petrol": "petrol",
-                }
-            )
+        fleet_archive["Fuel"] = fleet_archive["Fuel"].replace(
+            {
+                "Diesel/ Heavy oil": "diesel",
+                "Electric": "bev",
+                "Electric/ Diesel": "diesel",
+                "Electric/ Petrol": "phev",
+                "Gas": "diesel",
+                "Gas/Diesel": "diesel",
+                "Gas/Petrol": "diesel",
+                "Petrol": "petrol",
+            }
         )
         fleet_archive = fleet_archive[
-            fleet_archive["Fuel"].isin(["diesel", "petrol", "phev", "bev", "hybrid", "hyrdogen", "petrol hybrid"])]
+            fleet_archive["Fuel"].isin(
+                ["diesel", "petrol", "phev", "bev", "hybrid", "hyrdogen", "petrol hybrid"]
+            )
+        ]
         # make sure the other random fuel types are filtered/out replaced
-        fleet_archive = fleet_archive[
-            fleet_archive["VehicleType"].isin(["Car", "Goods"])]
+        fleet_archive = fleet_archive[fleet_archive["VehicleType"].isin(["Car", "Goods"])]
         fleet_archive = fleet_archive.drop(columns=["Keeper", "VehicleType"])
         self.fleet_archive = ut.camel_columns_to_snake(fleet_archive)
 
@@ -352,13 +356,18 @@ class IndexFleet:
         fleet_archive = fleet_archive[fleet_archive["tally"] > 0]
         fleet_archive["fuel"] = fleet_archive["fuel"].str.lower().fillna("diesel")
         fleet_archive = fleet_archive[
-            fleet_archive["fuel"].isin(["diesel", "petrol", "phev", "bev", "hybrid", "hydrogen", "petrol hybrid"])]
+            fleet_archive["fuel"].isin(
+                ["diesel", "petrol", "phev", "bev", "hybrid", "hydrogen", "petrol hybrid"]
+            )
+        ]
         fleet_segmentation = pd.read_csv(DVLA_BODY)
         # fleet_archive = fleet_archive.loc[(
         #                                       fleet_archive["body_type_text"].isin(fleet_segmentation["body_type_text"]))
         #                                   & (fleet_archive["wheelplan_text"].isin(fleet_segmentation["wheelplan_text"]))
         #                                   ].reset_index(drop=True)
-        fleet_archive = fleet_archive.merge(fleet_segmentation, how="left", on=["body_type_text", "wheelplan_text"])
+        fleet_archive = fleet_archive.merge(
+            fleet_segmentation, how="left", on=["body_type_text", "wheelplan_text"]
+        )
         fleet_archive = fleet_archive.drop(columns=["wheelplan_text", "body_type_text"])
         fleet_archive = fleet_archive[~fleet_archive["zone"].isin(["zzDisposal", "zzUnknown"])]
         fleet_archive = fleet_archive[~fleet_archive["fuel"].isin(["other"])]
@@ -389,9 +398,20 @@ class IndexFleet:
         fleet_archive["cya"] = fleet_archive["cya"] - fleet_archive["year"]
         fleet_archive["year"] = self.fleet_index_year
 
-        fleet_archive = fleet_archive.groupby(["zone", "fuel", "segment",
-                                               "vehicle_type", "cya", "year",
-                                               "avg_mass", "avg_es", "avg_co2"], as_index=False).sum()
+        fleet_archive = fleet_archive.groupby(
+            [
+                "zone",
+                "fuel",
+                "segment",
+                "vehicle_type",
+                "cya",
+                "year",
+                "avg_mass",
+                "avg_es",
+                "avg_co2",
+            ],
+            as_index=False,
+        ).sum()
 
         fleet_archive = ut.cya_group_to_list(fleet_archive)
         # Merge vehicles with identical attributes
@@ -411,7 +431,9 @@ class IndexFleet:
         fleet_df = self.fleet_archive.copy()
         # fleet_df = self.fleet_archive.loc[self.fleet_archive["year"] == int(self.fleet_index_year)]
         # Segmentation
-        print("Commencing imputation and determining from similar, this is a slow operation for large dataframes...")
+        print(
+            "Commencing imputation and determining from similar, this is a slow operation for large dataframes..."
+        )
         fleet_df = Imputation.segment_by_mass(fleet_df, "car")
         fleet_df = Imputation.segment_by_mass(fleet_df, "lgv")
         # Determine missing segment from cya, fuel and vehicle type
@@ -534,7 +556,7 @@ class Invariant:
         self.type = "general"
         self.scenario_name = "general"
         self.index_year = fleet_year
-        self.save_invariant = True # TODO(JC) Changed this from True to False
+        self.save_invariant = True  # TODO(JC) Changed this from True to False
         # Choose a scenario for grid carbon intensity
         self.grid_intensity_scenario = "CCC Balanced"  # Options include CCC Balanced or TAG
 
@@ -545,8 +567,6 @@ class Invariant:
         if self.save_invariant:
             self.__export_invariants()
         del self.index_fleet.fleet_archive
-
-
 
     def __generate_curves(self):
         """Call on CurveFitting functions to generate scrappage and SE curves."""
@@ -563,19 +583,15 @@ class Invariant:
         self.index_fleet.fleet_archive.to_csv(
             f"{OUT_PATH}/audit/fleet_archive.csv", index=False
         )
-        self.index_fleet.fleet.to_csv(
-            f"{OUT_PATH}/audit/index_fleet.csv", index=False
-        )
+        self.index_fleet.fleet.to_csv(f"{OUT_PATH}/audit/index_fleet.csv", index=False)
         self.index_fleet.characteristics.to_csv(
             f"{OUT_PATH}/audit/characteristics.csv", index=False
         )
-        self.scrappage_curve.to_csv(
-            f"{OUT_PATH}/audit/scrappage_curve.csv", index=False
-        )
+        self.scrappage_curve.to_csv(f"{OUT_PATH}/audit/scrappage_curve.csv", index=False)
 
     def __import_shared_tables(self):
         """Import scenario invariant/baseline inputs."""
-        #TODO(JC): change name of function in utility
+        # TODO(JC): change name of function in utility
         self.real_world_coefficients = ut.new_load_general_table("realWorldAttributes")
         self.fuel_characteristics = ut.new_load_general_table("fuelCharacteristics")
         self.yearly_co2_reduction = ut.new_load_general_table("newVehicleCarbonReduction")
@@ -620,9 +636,7 @@ class Invariant:
             car_scenario_baseline_demand = car_scenario_baseline_demand.loc[
                 car_scenario_baseline_demand.road_type == "Motorway", "total_vehicle_km"
             ].sum()
-            if np.round(car_sc01_baseline_demand) != np.round(
-                car_scenario_baseline_demand
-            ):
+            if np.round(car_sc01_baseline_demand) != np.round(car_scenario_baseline_demand):
                 print("\n****!! Car Baseline demand varies across scenarios!!***\n")
         # gv demand equivalents
         hgv_sc01_baseline_demand = pd.read_csv(
@@ -646,9 +660,7 @@ class Invariant:
             hgv_scenario_baseline_demand = hgv_scenario_baseline_demand.loc[
                 hgv_scenario_baseline_demand.road_type == "Motorway", "total_vehicle_km"
             ].sum()
-            if np.round(hgv_sc01_baseline_demand) != np.round(
-                hgv_scenario_baseline_demand
-            ):
+            if np.round(hgv_sc01_baseline_demand) != np.round(hgv_scenario_baseline_demand):
                 print("\n****!! HGV Baseline demand varies across scenarios!!***\n")
             # lgv placeholder
             path = str(DEMAND_PATH) + f"/{scenario_code}/"
@@ -658,9 +670,7 @@ class Invariant:
             lgv_scenario_baseline_demand = lgv_scenario_baseline_demand.loc[
                 lgv_scenario_baseline_demand.road_type == "Motorway", "total_vehicle_km"
             ].sum()
-            if np.round(lgv_sc01_baseline_demand) != np.round(
-                lgv_scenario_baseline_demand
-            ):
+            if np.round(lgv_sc01_baseline_demand) != np.round(lgv_scenario_baseline_demand):
                 print("\n****!! LGV Baseline demand varies across scenarios!!***\n")
 
     def __warp_tables(self):

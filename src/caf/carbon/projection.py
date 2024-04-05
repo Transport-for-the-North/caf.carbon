@@ -1,10 +1,13 @@
+# Built-Ins
 from datetime import datetime
 
-import pandas as pd
+# Third Party
 import numpy as np
+import pandas as pd
 
-from src.caf.carbon import utility as ut
+# Local Imports
 from src.caf.carbon import fleet_redistribution
+from src.caf.carbon import utility as ut
 from src.caf.carbon.load_data import OUT_PATH
 
 

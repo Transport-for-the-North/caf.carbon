@@ -1,13 +1,25 @@
+# Built-Ins
 import configparser as cf
+
+# Third Party
 import pandas as pd
-from src.caf.carbon import projection, scenario_dependent, scenario_invariant, output_figures
-from src.caf.carbon.load_data import REGION_FILTER, OUT_PATH
+
+# Local Imports
+from src.caf.carbon import (
+    output_figures,
+    projection,
+    scenario_dependent,
+    scenario_invariant,
+)
+from src.caf.carbon.load_data import OUT_PATH, REGION_FILTER
 
 
 class FleetEmissionsModel:
     """Calculate fleet emissions from fleet and demand data."""
 
-    def __init__(self, regions, ev_redistribution, scenario_list, run_fresh, run_name, fleet_year):
+    def __init__(
+        self, regions, ev_redistribution, scenario_list, run_fresh, run_name, fleet_year
+    ):
 
         # %% Load config file
         region_filter = pd.read_csv(REGION_FILTER)
@@ -25,15 +37,9 @@ class FleetEmissionsModel:
             print("\n\n\n###################")
             print(i)
             print("###################")
-            scenario = scenario_dependent.Scenario(
-                region_filter, i, invariant_data, pathway
-            )
+            scenario = scenario_dependent.Scenario(region_filter, i, invariant_data, pathway)
             model = projection.Model(
-                region_filter,
-                invariant_data,
-                scenario,
-                ev_redistribution,
-                run_name
+                region_filter, invariant_data, scenario, ev_redistribution, run_name
             )
             model.allocate_chainage()
             model.predict_emissions()

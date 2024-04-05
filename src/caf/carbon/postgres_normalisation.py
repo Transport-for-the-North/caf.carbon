@@ -1,7 +1,10 @@
+# Built-Ins
 from datetime import datetime
-from load_data import OUT_PATH
+
+# Third Party
 import numpy as np
 import pandas as pd
+from load_data import OUT_PATH
 
 
 class NormaliseOutputs:

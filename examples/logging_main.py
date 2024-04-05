@@ -1,7 +1,12 @@
+# Built-Ins
 import logging
-from src.caf.carbon.load_data import LOG_PATH
-from src.caf.carbon import fleet_emission_model, vkm_emissions_model
+
+# Third Party
 from caf.toolkit.log_helpers import LogHelper, ToolDetails
+
+# Local Imports
+from src.caf.carbon import fleet_emission_model, vkm_emissions_model
+from src.caf.carbon.load_data import LOG_PATH
 
 
 def main():
@@ -25,14 +30,15 @@ def main():
 
     # run the fleet emissions model
     if run_fleet:
-        run_fleet_emissions = fleet_emission_model.FleetEmissionsModel(regions, ev_redistribution,
-                                                                       scenarios, run_fresh, run_name, fleet_year)
+        run_fleet_emissions = fleet_emission_model.FleetEmissionsModel(
+            regions, ev_redistribution, scenarios, run_fresh, run_name, fleet_year
+        )
     if run_vkm:
         run_vkm_emissions = vkm_emissions_model.VkmEmissionsModel(regions, scenarios)
 
 
-if __name__ == '__main__':
-    log = logging.getLogger('__main__')
+if __name__ == "__main__":
+    log = logging.getLogger("__main__")
     log.setLevel(logging.DEBUG)
     details = ToolDetails("caf.carbon", "1.0.0")
     main()
