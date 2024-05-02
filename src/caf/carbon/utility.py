@@ -5,10 +5,11 @@ import re
 # Third Party
 import pandas as pd
 from pandas import DataFrame
+import math
 
 # Local Imports
-from src.caf.carbon import audit_tests as at
-from src.caf.carbon.load_data import GENERAL_TABLES_PATH, SCENARIO_TABLES_PATH
+from caf.carbon import audit_tests as at
+from caf.carbon.load_data import GENERAL_TABLES_PATH, SCENARIO_TABLES_PATH
 
 
 # %% Helper functions
@@ -66,7 +67,7 @@ def new_load_general_table(sheet_name: str) -> pd.DataFrame:
     return table
 
 
-def new_load_scenario_tables(scenario: str, table_name: str) -> pd.DataFrame:
+def new_load_scenario_tables(scenario: str, table_name: str, suffix) -> pd.DataFrame:
     """Load scenario tables from inputs folder"""
     # TODO(JC): - update in future
     table_ranges = {
@@ -78,10 +79,14 @@ def new_load_scenario_tables(scenario: str, table_name: str) -> pd.DataFrame:
         "ChainageReduction": "AN:AU",
     }
 
+    if suffix in ["none", ""]:
+        suffix = ".xlsx"
+    else:
+        suffix = "_" + suffix + ".xlsx"
     use_cols = table_ranges[table_name]
 
     table = pd.read_excel(
-        io=SCENARIO_TABLES_PATH, sheet_name=scenario, usecols=use_cols, header=1
+        io='{}{}'.format(SCENARIO_TABLES_PATH, suffix), sheet_name=scenario, usecols=use_cols, header=1
     ).dropna()
 
     table = table.rename(columns=lambda x: re.sub(r"\.[0-9]$", "", str(x)))
@@ -90,7 +95,6 @@ def new_load_scenario_tables(scenario: str, table_name: str) -> pd.DataFrame:
     return table
 
 
-# TODO(JC) change the way this is loaded in
 def load_csv(self, table_name):
     """Load table from a csv with only one table.
 
@@ -341,3 +345,8 @@ def interpolate_timeline(table_df, grouping_vars, value_var, melt=True):
     )
     table_df["year"] = table_df["year"].dt.year
     return table_df
+
+
+def s_curve_value(a, k, x0, x):
+    value = a / (1 + math.exp(-k * (x-x0)))
+    return value

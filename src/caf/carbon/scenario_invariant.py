@@ -5,11 +5,12 @@ from sklearn import impute
 from sklearn.experimental import enable_iterative_imputer
 
 # Local Imports
-from src.caf.carbon import utility as ut
-from src.caf.carbon.load_data import (
+from caf.carbon import utility as ut
+from caf.carbon.load_data import (
     ANPR_DATA,
     DEMAND_PATH,
     DVLA_BODY,
+    SEGMENT_PATH,
     MSOA_AREA_TYPE,
     MSOA_BODY,
     MSOA_LAD,
@@ -296,7 +297,7 @@ class IndexFleet:
             self.__basic_clean()
             self.__advanced_clean()
             self.__split_tables()
-            # self.__map_zones() # TODO: likely unneccesary, check
+            self.__map_zones()
         else:
             self.fleet_archive = pd.read_csv(f"{OUT_PATH}/audit/fleet_archive.csv")
             self.fleet = pd.read_csv(f"{OUT_PATH}/audit/index_fleet.csv")
@@ -304,7 +305,6 @@ class IndexFleet:
 
     def __load_fleet(self):
         """Read in the DfT fleet data for cars, vans and HGVs and concetenate."""
-        # TODO: add fuel and fleet conversions
         fleet_archive = pd.read_csv(VEHICLE_PATH)
         fleet_archive = fleet_archive.rename(
             columns={
@@ -361,21 +361,12 @@ class IndexFleet:
             )
         ]
         fleet_segmentation = pd.read_csv(DVLA_BODY)
-        # fleet_archive = fleet_archive.loc[(
-        #                                       fleet_archive["body_type_text"].isin(fleet_segmentation["body_type_text"]))
-        #                                   & (fleet_archive["wheelplan_text"].isin(fleet_segmentation["wheelplan_text"]))
-        #                                   ].reset_index(drop=True)
-        fleet_archive = fleet_archive.merge(
-            fleet_segmentation, how="left", on=["body_type_text", "wheelplan_text"]
-        )
+        fleet_archive = fleet_archive.merge(fleet_segmentation, how="left", on=["body_type_text", "wheelplan_text"])
         fleet_archive = fleet_archive.drop(columns=["wheelplan_text", "body_type_text"])
         fleet_archive = fleet_archive[~fleet_archive["zone"].isin(["zzDisposal", "zzUnknown"])]
         fleet_archive = fleet_archive[~fleet_archive["fuel"].isin(["other"])]
         fleet_archive["segment"] = fleet_archive["segment"].fillna("Unknown")
-        # Convert hev cars to petrol hybrids
-        # fleet_archive.loc[
-        #     (fleet_archive["vehicle_type"] == "car") & (fleet_archive["fuel"] == "hev"), "fuel"
-        # ] = "petrol hybrid"
+
         # Convert HEV/PHEV non-cars to BEVs
         fleet_archive.loc[
             (fleet_archive["vehicle_type"].isin(["hgv", "lgv"]))
@@ -387,13 +378,8 @@ class IndexFleet:
             & (fleet_archive["fuel"].isin(["petrol"])),
             "fuel",
         ] = "diesel"
-        # Determine missing CYA from eurostandard and vehicle type
-        # fleet_archive = ut.determine_from_similar(
-        #     fleet_archive,
-        #     shared_qualities=["year", "vehicle_type", "euro_standard"],
-        #     missing_quality="cya",
-        #     value_to_distribute="tally",
-        # )
+        fleet_archive = fleet_archive.groupby(["year", "avg_co2", "avg_mass", "avg_es", "zone", "vehicle_type",
+                                               "segment", "fuel"], as_index=False).sum()
         fleet_archive["cya"] = self.fleet_index_year
         fleet_archive["cya"] = fleet_archive["cya"] - fleet_archive["year"]
         fleet_archive["year"] = self.fleet_index_year
@@ -429,7 +415,6 @@ class IndexFleet:
         """
         print("Index year:", self.fleet_index_year)
         fleet_df = self.fleet_archive.copy()
-        # fleet_df = self.fleet_archive.loc[self.fleet_archive["year"] == int(self.fleet_index_year)]
         # Segmentation
         print(
             "Commencing imputation and determining from similar, this is a slow operation for large dataframes..."
@@ -453,7 +438,6 @@ class IndexFleet:
     def __split_tables(self):
         """Split table into fleet only and emission characteristics only."""
         fleet_df = self.fleet.copy()
-        # fleet_df = ut.cya_list_to_column(fleet_df, shared_value="tally")
         fleet_df["cohort"] = fleet_df["year"] - fleet_df["cya"]
         fleet_df = fleet_df.drop(columns="cya")
 
@@ -476,66 +460,20 @@ class IndexFleet:
         )
 
     def __map_zones(self):
-        """Translate fleet data from LAD to MSOA zones.
-
-        Uses the MSOA tally and the LAD vehicle shares to proportionately
-        assign vehicles to MSOA zones.
+        """Translate fleet data to correct vehicle types.
         """
         # Aggregate the fleet data to the MSOA Zone level
         fleet_df = self.fleet.copy()
+        segmentation_distribution = pd.read_csv(SEGMENT_PATH)
+        fleet_df = fleet_df.rename(columns={"segment": "original_segment"})
+        fleet_df = fleet_df.merge(
+            segmentation_distribution, how="outer", on=["vehicle_type", "original_segment"]
+        )
+        fleet_df["tally"] = fleet_df["tally"] * fleet_df["split"]
+        fleet_df = fleet_df.drop(columns=["original_segment", "split"])
+        fleet_df = fleet_df.groupby(["zone", "fuel", "vehicle_type", "year", "segment", "cohort"], as_index=False).sum()
 
-        # Calculate the share each vehicle makes up of its vehicle type in its LAD
-        group_by_segment = (
-            fleet_df.groupby(ut.all_but(fleet_df, "tally"))["tally"].sum().reset_index()
-        )
-        group_by_segment = group_by_segment.drop(columns="year")
-        group_by_segment["shr_of_lad_type"] = group_by_segment["tally"] / fleet_df.groupby(
-            ["zone", "vehicle_type"]
-        )["tally"].transform("sum")
-        # Vehicle type tally by MSOA
-        msoa_bodytype = pd.read_csv(MSOA_BODY).fillna(0)
-        msoa_bodytype = pd.melt(
-            msoa_bodytype,
-            id_vars="MSOA11CD",
-            var_name="vehicle_type",
-            value_vars=["Cars", "LGVs", "Goods"],
-            value_name="msoa_tally",
-        )
-        msoa_bodytype["vehicle_type"] = msoa_bodytype["vehicle_type"].replace(
-            {"Cars": "car", "LGVs": "lgv", "Goods": "hgv"}
-        )
-        # Connects LAD to MSOA
-        msoa_lad_lookup = pd.read_csv(MSOA_LAD)
-        # join on msoa, group by msoa zones & any categories, sum by msoa zones & any categories
-        msoa_zones = pd.read_csv(NOHAM_TO_MSOA).rename(columns={"msoa11cd": "MSOA11CD"})
-        msoa_zones = msoa_zones.merge(msoa_lad_lookup, on="MSOA11CD")
-        vehicle_msoa_zones = pd.merge(msoa_zones, msoa_bodytype, on="MSOA11CD", how="inner")
-        vehicle_msoa_zones = vehicle_msoa_zones.groupby(
-            ["MSOA11CD", "vehicle_type", "TAG_LAD"], as_index=False
-        ).sum()
-        merged_data = vehicle_msoa_zones.merge(
-            group_by_segment,
-            left_on=["TAG_LAD", "vehicle_type"],
-            right_on=["zone", "vehicle_type"],
-        )
-        merged_data = merged_data.loc[merged_data["msoa_tally"] > 0]
-
-        # MSOA Tally for vehicle equals Vehicle share of LAD * MSOA total tally
-        merged_data["tally"] = merged_data["shr_of_lad_type"] * merged_data["msoa_tally"]
-        merged_data = (
-            merged_data.groupby(
-                ["MSOA11CD", "segment", "cohort", "fuel", "vehicle_type", "msoa_tally"]
-            )["tally"]
-            .sum()
-            .reset_index()
-        )
-        merged_data["tally"] = merged_data["tally"].round().astype(int)
-
-        # Write out
-        vehicle_types = fleet_df[["year", "segment", "vehicle_type"]].drop_duplicates()
-        merged_data = merged_data.rename(columns={"MSOA11CD": "zone"})
-        merged_data = merged_data[["cohort", "fuel", "segment", "zone", "tally"]]
-        self.fleet = merged_data.merge(vehicle_types, on="segment", how="left")
+        self.fleet = fleet_df
 
 
 class Invariant:
@@ -556,7 +494,7 @@ class Invariant:
         self.type = "general"
         self.scenario_name = "general"
         self.index_year = fleet_year
-        self.save_invariant = True  # TODO(JC) Changed this from True to False
+        self.save_invariant = True
         # Choose a scenario for grid carbon intensity
         self.grid_intensity_scenario = "CCC Balanced"  # Options include CCC Balanced or TAG
 
@@ -591,7 +529,6 @@ class Invariant:
 
     def __import_shared_tables(self):
         """Import scenario invariant/baseline inputs."""
-        # TODO(JC): change name of function in utility
         self.real_world_coefficients = ut.new_load_general_table("realWorldAttributes")
         self.fuel_characteristics = ut.new_load_general_table("fuelCharacteristics")
         self.yearly_co2_reduction = ut.new_load_general_table("newVehicleCarbonReduction")
@@ -601,16 +538,6 @@ class Invariant:
         self.naei_coefficients = ut.new_load_general_table("naei")
         self.grid_consumption = ut.new_load_general_table("gridConsumption")
         self.grid_intensity = ut.new_load_general_table("gridCarbonIntensity")
-
-        # self.real_world_coefficients = ut.load_table(self, "realWorldAttributes")
-        # self.fuel_characteristics = ut.load_table(self, "fuelCharacteristics")
-        # self.yearly_co2_reduction = ut.load_table(self, "newVehicleCarbonReduction")
-        # self.biofuel_reduction = ut.load_table(self, "fuelComposition")
-        # self.ghg_equivalent = ut.load_table(self, "GHGEquivalent")
-        # self.pt_ghg_factor = ut.load_table(self, "PTGHGEquivalent")
-        # self.naei_coefficients = ut.load_csv(self, "naei")
-        # self.grid_consumption = ut.load_table(self, "gridConsumption", table_type="gridCo2")
-        # self.grid_intensity = ut.load_table(self, "gridCarbonIntensity", table_type="gridCo2")
 
         self.msoa_area_info = pd.read_csv(MSOA_AREA_TYPE)
         self.msoa_area_info = self.msoa_area_info.rename(

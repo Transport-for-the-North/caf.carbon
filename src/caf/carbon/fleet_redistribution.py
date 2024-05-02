@@ -5,7 +5,7 @@ from datetime import datetime
 import pandas as pd
 
 # Local Imports
-from src.caf.carbon.load_data import DEMOGRAPHICS_DATA, OUT_PATH, TRAVELLER_DATA
+from caf.carbon.load_data import DEMOGRAPHICS_DATA, OUT_PATH, TRAVELLER_DATA
 
 
 class Redistribution:

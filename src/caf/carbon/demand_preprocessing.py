@@ -20,7 +20,7 @@ class Demand:
         self.demand_factors = pd.read_csv(DEMAND_FACTORS)
         self.region_filter = pd.read_csv(REGION_FILTER)
         self.region_filter = self.region_filter[
-            self.region_filter["region"].isin(["West Midlands", "East Midlands"])
+            self.region_filter["stb_name"].isin(["Transport East"])
         ]
         self.demand_data_path = str(DEMAND_DATA)
         self.link_data_path = str(LINK_DATA)
@@ -32,13 +32,13 @@ class Demand:
         self.link_road_types["a"] = self.link_road_types["a"].astype(str)
         self.link_road_types["b"] = self.link_road_types["b"].astype(str)
         self.msoa_rtm_lookup = pd.read_csv(str(MSOA_RTM_TRANSLATION)).rename(
-            columns={"MSOA_id": "origin_zone"}
+            columns={"msoa11cd_id": "origin_zone"}  # msoa11cd_id or msoa11_id
         )
         self.msoa_rtm_lookup = self.msoa_rtm_lookup[
-            ["origin_zone", "MRTM2v14_id", "MRTM2v14_to_MSOA"]
+            ["origin_zone", "MiHAMv10_id", "MiHAMv10_to_msoa11cd"]  # ["origin_zone", "SERTM_id", "SERTM_to_msoa11"]
         ]
         self.msoa_rtm_lookup = self.msoa_rtm_lookup.loc[
-            self.msoa_rtm_lookup["origin_zone"].isin(self.region_filter["msoa11_id"])
+            self.msoa_rtm_lookup["origin_zone"].isin(self.region_filter["MSOA11CD"])
         ].reset_index(drop=True)
         self.available_years = available_years
 
@@ -196,10 +196,10 @@ class Demand:
 
     def spatial_translation(self, dataframe):
         """Interpolate and add the missing years to the vkm data."""
-        dataframe = dataframe.rename(columns={"o": "MRTM2v14_id"})
-        dataframe = dataframe.merge(self.msoa_rtm_lookup, how="inner", on="MRTM2v14_id")
+        dataframe = dataframe.rename(columns={"o": "MiHAMv10_id"})  # SERTM_id"
+        dataframe = dataframe.merge(self.msoa_rtm_lookup, how="inner", on="MiHAMv10_id")  # "SERTM_id"
 
-        dataframe["abs_demand"] = dataframe["abs_demand"] * dataframe["MRTM2v14_to_MSOA"]
+        dataframe["abs_demand"] = dataframe["abs_demand"] * dataframe["MiHAMv10_to_msoa11cd"]  # "SERTM_to_msoa11"
         dataframe = dataframe[["origin_zone", "a", "b", "abs_demand"]]
         dataframe = dataframe.groupby(["origin_zone", "a", "b"], as_index=False).sum()
         return dataframe
@@ -230,13 +230,13 @@ class Demand:
                 if year == 19:
                     network_links = pd.read_csv(
                         self.link_data_path
-                        + rf"\link_table_MD2_B19_ass_v049_{time}.csv"
+                        + rf"\20{year}\link_table_SE_B19_{time}_net_v020.csv"
                         # rf"\20{year}\link_table_SE_B19_{time}_net_v020.csv"
                     ).rename(columns={"A": "a", "B": "b"})
                 else:
                     network_links = pd.read_csv(
                         self.link_data_path
-                        + rf"\link_table_MD2_f{year}_ass_v049_{time}.csv"
+                        + rf"\20{year}\link_table_SE_DM_FY20{year}_{time}_net_v002.csv"
                         # + rf"\20{year}\link_table_SE_DM_FY{year}_{time}_net_v002.csv"
                     ).rename(columns={"A": "a", "B": "b"})
                 network_links["a"] = network_links["a"].astype(str)
@@ -247,14 +247,14 @@ class Demand:
                         demand_table = pd.DataFrame(
                             pd.read_hdf(
                                 self.demand_data_path
-                                + rf"\20{year}\MD2_b19_ass_v049_{time}_SatPig_{user_class}.h5"
+                                + rf"\20{year}\MD2_b19_ass_v049_{time}_SatPig_{user_class}.h5"  # SE_B19_{time}_net_v020_SatPig_{user_class}.h5
                             )
                         ).reset_index()
                     else:
                         demand_table = pd.DataFrame(
                             pd.read_hdf(
                                 self.demand_data_path
-                                + rf"\20{year}\MD2_f{year}_ass_v049_{time}_SatPig_{user_class}.h5"
+                                + rf"\20{year}\SE_DM_FY20{year}_{time}_net_v002_SatPig_{user_class}.h5"
                             )
                         ).reset_index()
                         print(f"Loaded demand table")
@@ -303,5 +303,7 @@ def batch(iterable, n=1):
         yield iterable[ndx : min(ndx + n, l)]
 
 
-test1 = Demand([40])
-test1 = Demand([50])
+test2 = Demand([25])
+test3 = Demand([31])
+test4 = Demand([41])
+test5 = Demand([51])

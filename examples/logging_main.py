@@ -5,8 +5,8 @@ import logging
 from caf.toolkit.log_helpers import LogHelper, ToolDetails
 
 # Local Imports
-from src.caf.carbon import fleet_emission_model, vkm_emissions_model
-from src.caf.carbon.load_data import LOG_PATH
+from caf.carbon import fleet_emission_model, vkm_emissions_model
+from caf.carbon.load_data import LOG_PATH
 
 
 def main():
@@ -18,7 +18,7 @@ def main():
     # Which travel scenarios to run with? ["Business As Usual Core", "Accelerated EV Core"]
     scenarios = ["Business As Usual Core", "Accelerated EV Core"]
     run_fresh = False
-    run_name = "TfN"
+    run_name = "TfN_decarb"
     # Distribute EVs without income assumptions (False) or with income factors (True)?
     ev_redistribution = False
 
@@ -27,11 +27,13 @@ def main():
     run_fleet = True
 
     fleet_year = 2023
+    # decarb pathway
+    pathway = "decarb"  # Options include "none", "decarb", "old"
 
     # run the fleet emissions model
     if run_fleet:
         run_fleet_emissions = fleet_emission_model.FleetEmissionsModel(
-            regions, ev_redistribution, scenarios, run_fresh, run_name, fleet_year
+            regions, ev_redistribution, scenarios, run_fresh, run_name, fleet_year, pathway
         )
     if run_vkm:
         run_vkm_emissions = vkm_emissions_model.VkmEmissionsModel(regions, scenarios)
@@ -42,5 +44,3 @@ if __name__ == "__main__":
     log.setLevel(logging.DEBUG)
     details = ToolDetails("caf.carbon", "1.0.0")
     main()
-    # with LogHelper(__package__, details, log_file=LOG_PATH):
-    #     main()

@@ -5,20 +5,20 @@ import configparser as cf
 import pandas as pd
 
 # Local Imports
-from src.caf.carbon import (
+from caf.carbon import (
     output_figures,
     projection,
     scenario_dependent,
     scenario_invariant,
 )
-from src.caf.carbon.load_data import OUT_PATH, REGION_FILTER
+from caf.carbon.load_data import OUT_PATH, REGION_FILTER
 
 
 class FleetEmissionsModel:
     """Calculate fleet emissions from fleet and demand data."""
 
     def __init__(
-        self, regions, ev_redistribution, scenario_list, run_fresh, run_name, fleet_year
+        self, regions, ev_redistribution, scenario_list, run_fresh, run_name, fleet_year, pathway
     ):
 
         # %% Load config file
@@ -29,9 +29,6 @@ class FleetEmissionsModel:
         index_fleet = scenario_invariant.IndexFleet(run_fresh, fleet_year)
         invariant_data = scenario_invariant.Invariant(index_fleet, fleet_year)
 
-        # State whether you want to generate baseline projections or decarbonization
-        # pathway projections
-        pathway = "none"  # Options include "none", "element"
         # %% Scenario Dependent
         for i in scenario_list:
             print("\n\n\n###################")

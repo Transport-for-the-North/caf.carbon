@@ -6,9 +6,9 @@ import numpy as np
 import pandas as pd
 
 # Local Imports
-from src.caf.carbon import fleet_redistribution
-from src.caf.carbon import utility as ut
-from src.caf.carbon.load_data import OUT_PATH
+from caf.carbon import fleet_redistribution
+from caf.carbon import utility as ut
+from caf.carbon.load_data import OUT_PATH
 
 
 class Model:

@@ -5,8 +5,8 @@ import configparser as cf
 import pandas as pd
 
 # Local Imports
-from src.caf.carbon import utility as ut
-from src.caf.carbon.load_data import DEMAND_PATH
+from caf.carbon import utility as ut
+from caf.carbon.load_data import DEMAND_PATH
 
 
 class Scenario:
@@ -46,34 +46,19 @@ class Scenario:
     def __load_scenario(self, pathway="none"):
         """Load in scenario tables."""
         self.seg_share_of_year_type_sales = ut.new_load_scenario_tables(
-            self.scenario_name, "segSales_propOfTypeYear"
+            self.scenario_name, "segSales_propOfTypeYear", suffix=pathway
         )
         self.fuel_share_of_year_seg_sales = ut.new_load_scenario_tables(
-            self.scenario_name, "fuelSales_propOfSegYear"
+            self.scenario_name, "fuelSales_propOfSegYear", suffix=pathway
         )
         self.type_fleet_size_growth = ut.new_load_scenario_tables(
-            self.scenario_name, "fleetSize_totOfYear"
+            self.scenario_name, "fleetSize_totOfYear", suffix=pathway
         )
-        self.co2_reductions = ut.new_load_scenario_tables(self.scenario_name, "co2Reduction")
+        self.co2_reductions = ut.new_load_scenario_tables(self.scenario_name, "co2Reduction", suffix=pathway
+        )
         self.km_index_reductions = ut.new_load_scenario_tables(
-            self.scenario_name, "ChainageReduction"
+            self.scenario_name, "ChainageReduction", suffix=pathway
         )
-
-        # # File paths are different if the index year is 2015
-        # # Carry out some preprocessing so the tables are consistent with 2018 inputs
-        # if self.index_year == 2015:  # !
-        #     seg_share_2015 = pd.read_csv(SEG_SHARE)
-        #     seg_share_2015.columns = ["segment", 2015]
-        #     self.seg_share_of_year_type_sales = self.seg_share_of_year_type_sales.merge(
-        #         seg_share_2015, on="segment", how="left"
-        #     )
-        #     fuel_share_2015 = pd.read_csv(FUEL_SHARE)
-        #     fuel_share_2015.columns = ["segment", "fuel", 2015]
-        #     self.fuel_share_of_year_seg_sales = self.fuel_share_of_year_seg_sales.merge(
-        #         fuel_share_2015, on=["segment", "fuel"], how="left"
-        #     )
-        #     self.seg_share_of_year_type_sales = self.seg_share_of_year_type_sales.fillna(0)
-        #     self.fuel_share_of_year_seg_sales = self.fuel_share_of_year_seg_sales.fillna(0)
 
     def __warp_tables(self):
         """Preprocess and transform scenario inputs."""
