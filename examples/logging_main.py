@@ -12,13 +12,12 @@ from caf.carbon.load_data import LOG_PATH
 def main():
     """Run CAF.Carbon"""
     # Which regions is the model being run for?
-    # ["North West", "North East", "Yorkshire and The Humber", "East of England"
-    #  "East Midlands", "West Midlands", "South East", "South West"]
-    regions = ["North West", "North East", "Yorkshire and The Humber"]
+    # ["Transport for the North", "Midlands Connect", "Transport East"]
+    regions = ["Transport for the North"]
     # Which travel scenarios to run with? ["Business As Usual Core", "Accelerated EV Core"]
     scenarios = ["Business As Usual Core", "Accelerated EV Core"]
     run_fresh = False
-    run_name = "TfN_decarb"
+    run_name = "decarb"
     # Distribute EVs without income assumptions (False) or with income factors (True)?
     ev_redistribution = False
 

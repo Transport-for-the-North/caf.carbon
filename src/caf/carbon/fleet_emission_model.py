@@ -23,7 +23,7 @@ class FleetEmissionsModel:
 
         # %% Load config file
         region_filter = pd.read_csv(REGION_FILTER)
-        region_filter = region_filter[region_filter["region"].isin(regions)]
+        region_filter = region_filter[region_filter["stb_name"].isin(regions)]
 
         # %% Scenario Agnostic
         index_fleet = scenario_invariant.IndexFleet(run_fresh, fleet_year)

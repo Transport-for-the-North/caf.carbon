@@ -361,11 +361,15 @@ class IndexFleet:
             )
         ]
         fleet_segmentation = pd.read_csv(DVLA_BODY)
-        fleet_archive = fleet_archive.merge(fleet_segmentation, how="left", on=["body_type_text", "wheelplan_text"])
+        fleet_archive = fleet_archive.merge(
+            fleet_segmentation, how="left", on=["body_type_text", "wheelplan_text"]
+        )
         fleet_archive = fleet_archive.drop(columns=["wheelplan_text", "body_type_text"])
         fleet_archive = fleet_archive[~fleet_archive["zone"].isin(["zzDisposal", "zzUnknown"])]
         fleet_archive = fleet_archive[~fleet_archive["fuel"].isin(["other"])]
         fleet_archive["segment"] = fleet_archive["segment"].fillna("Unknown")
+
+        # multiplier apply
 
         # Convert HEV/PHEV non-cars to BEVs
         fleet_archive.loc[
@@ -378,8 +382,19 @@ class IndexFleet:
             & (fleet_archive["fuel"].isin(["petrol"])),
             "fuel",
         ] = "diesel"
-        fleet_archive = fleet_archive.groupby(["year", "avg_co2", "avg_mass", "avg_es", "zone", "vehicle_type",
-                                               "segment", "fuel"], as_index=False).sum()
+        fleet_archive = fleet_archive.groupby(
+            [
+                "year",
+                "avg_co2",
+                "avg_mass",
+                "avg_es",
+                "zone",
+                "vehicle_type",
+                "segment",
+                "fuel"
+            ],
+            as_index=False
+        ).sum()
         fleet_archive["cya"] = self.fleet_index_year
         fleet_archive["cya"] = fleet_archive["cya"] - fleet_archive["year"]
         fleet_archive["year"] = self.fleet_index_year
@@ -460,8 +475,7 @@ class IndexFleet:
         )
 
     def __map_zones(self):
-        """Translate fleet data to correct vehicle types.
-        """
+        """Translate fleet data to correct vehicle types."""
         # Aggregate the fleet data to the MSOA Zone level
         fleet_df = self.fleet.copy()
         segmentation_distribution = pd.read_csv(SEGMENT_PATH)
@@ -471,7 +485,9 @@ class IndexFleet:
         )
         fleet_df["tally"] = fleet_df["tally"] * fleet_df["split"]
         fleet_df = fleet_df.drop(columns=["original_segment", "split"])
-        fleet_df = fleet_df.groupby(["zone", "fuel", "vehicle_type", "year", "segment", "cohort"], as_index=False).sum()
+        fleet_df = fleet_df.groupby(
+            ["zone", "fuel", "vehicle_type", "year", "segment", "cohort"], as_index=False
+        ).sum()
 
         self.fleet = fleet_df
 

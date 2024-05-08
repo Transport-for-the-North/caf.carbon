@@ -86,7 +86,10 @@ def new_load_scenario_tables(scenario: str, table_name: str, suffix) -> pd.DataF
     use_cols = table_ranges[table_name]
 
     table = pd.read_excel(
-        io='{}{}'.format(SCENARIO_TABLES_PATH, suffix), sheet_name=scenario, usecols=use_cols, header=1
+        io='{}{}'.format(SCENARIO_TABLES_PATH, suffix),
+        sheet_name=scenario,
+        usecols=use_cols,
+        header=1
     ).dropna()
 
     table = table.rename(columns=lambda x: re.sub(r"\.[0-9]$", "", str(x)))
@@ -348,5 +351,5 @@ def interpolate_timeline(table_df, grouping_vars, value_var, melt=True):
 
 
 def s_curve_value(a, k, x0, x):
-    value = a / (1 + math.exp(-k * (x-x0)))
+    value = a / (1 + math.exp(-k * (x - x0)))
     return value

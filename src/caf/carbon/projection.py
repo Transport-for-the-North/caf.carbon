@@ -201,7 +201,7 @@ class Model:
         print("\rProjection complete.\n")
         # Iterate through all model years loading and appending demand.
         self.projected_fleet = self.projected_fleet.loc[
-            self.projected_fleet["zone"].isin(self.region_filter["msoa11_id"])
+            self.projected_fleet["zone"].isin(self.region_filter["MSOA11CD"])
         ].reset_index(drop=True)
         return self.projected_fleet
 
