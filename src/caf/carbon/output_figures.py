@@ -1,20 +1,28 @@
-from datetime import datetime
-import os
-import matplotlib.pyplot as plt
-import re
+# Built-Ins
 import configparser as cf
-import pandas as pd
+import os
+import re
+from datetime import datetime
+
+# Third Party
+import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 
+# Local Imports
 from caf.carbon import utility as ut
-
-from caf.carbon.load_data import OUT_PATH, NOHAM_AREA_TYPE, NOHAM_TO_MSOA, TARGET_AREA_TYPE
+from caf.carbon.load_data import (
+    NOHAM_AREA_TYPE,
+    NOHAM_TO_MSOA,
+    OUT_PATH,
+    TARGET_AREA_TYPE,
+)
 
 
 class SummaryOutputs:
     """Combine scenario outputs and transform into summary outputs."""
 
-    def __init__(self, time_period_list, pathway, invariant_obj, scenario_obj):
+    def __init__(self, pathway, invariant_obj, scenario_obj):
         """
         
         Parameters

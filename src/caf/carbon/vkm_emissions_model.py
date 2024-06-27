@@ -694,7 +694,6 @@ def interpolate_to_input(current_directory):
     """
     Read created files for each scenario, linear interpolation to get outputs for model input years
     """
-    # TODO replace with scenarios from logging_main
     scenarios = ["core", "high", "low"]
     for scenario in scenarios:
 

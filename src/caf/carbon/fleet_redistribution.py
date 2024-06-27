@@ -1,10 +1,11 @@
 # Built-Ins
 from datetime import datetime
-from caf.carbon.load_data import OUT_PATH, DEMOGRAPHICS_DATA, TRAVELLER_DATA
-
 
 # Third Party
 import pandas as pd
+
+# Local Imports
+from caf.carbon.load_data import DEMOGRAPHICS_DATA, OUT_PATH, TRAVELLER_DATA
 
 
 class Redistribution:

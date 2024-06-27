@@ -1,6 +1,8 @@
-import pandas as pd
+# Built-Ins
 import math
 
+# Third Party
+import pandas as pd
 import utility as ut
 
 

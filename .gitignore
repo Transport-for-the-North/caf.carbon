@@ -20,6 +20,7 @@ __pycache__/
 *.xlsx
 *.pbz2
 *.docx
+*.env
 
 # Distribution / packaging
 .Python
