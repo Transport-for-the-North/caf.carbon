@@ -76,10 +76,10 @@ class SummaryOutputs:
             melt=False)
         area_info.to_csv("interpolated_area_info.csv")
 
-        self.scenario_rename = {"BAU": "SC01", "AE": "SC02", "BAUH": "SC03", "AEH": "SC04","BAUL": "SC05",
-                                "AEL": "SC06", "Business As Usual Core": "SC01", "Accelerated EV Core": "SC02"}
-        scenario_full_name = {"SC01": "Business As Usual Core",
-                              "SC02": "Accelerated EV Core"}
+        self.scenario_rename = {"BAU": "SC05", "AE": "SC02", "BAUH": "SC03", "AEH": "SC04","BAUL": "SC05",
+                                "AEL": "SC06", "Business As Usual Core": "SC05", "Accelerated EV Core": "SC06"}
+        scenario_full_name = {"SC05": "Business As Usual Core",
+                              "SC06": "Accelerated EV Core"}
 
         # Set empty DataFrames to populate with data from all scenarios
         all_scenarios = pd.DataFrame()

@@ -3,7 +3,6 @@
 def _get_version() -> str:
     from pathlib import Path
     from versioningit import get_version
-
     return get_version(
         project_dir=Path(__file__).parents[3],
     )

@@ -25,7 +25,6 @@ class Redistribution:
         self.scenario = scenario_obj
         self.projected_fleet = projected_fleet.copy()
         self.date = datetime.today().strftime("%Y_%m_%d")
-        self.run_type = invariant_obj.run_type.lower()
 
         if run_fresh:
             self.__input_weights()
@@ -43,7 +42,7 @@ class Redistribution:
 
     def __input_weights(self):
         """Build EV weights if necessary."""
-        base_pop = pd.read_pickle(DEMOGRAPHICS_DATA, compression="bz2")
+        base_pop = pd.read_csv(DEMOGRAPHICS_DATA, compression="bz2")
         base_pop = base_pop[["MSOA", "tfn_tt", "people"]].rename(columns={"MSOA": "zone"})
         traveller_types = pd.read_csv(TRAVELLER_DATA)
         # deselect traveller types who can not own cars
@@ -255,7 +254,7 @@ class Redistribution:
         print("Function parameters determined")
         self.calibration_data = self.calibration_data.reset_index()
         self.calibration_data = self.calibration_data[["zone", "derived ev"]]
-        self.calibration_data.to_csv(f"{self.outpath}audit/fleet_weights.csv")
+        self.calibration_data.to_csv(f"{self.outpath}/audit/fleet_weights.csv")
 
     def __transform_fleet(self):
         """Transform fleet to reflect socioeconomic EV weights."""

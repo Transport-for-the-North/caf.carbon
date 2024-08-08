@@ -6,10 +6,20 @@ from caf.carbon.load_data import SEG_SHARE, FUEL_SHARE, DEMAND_PATH
 
 class Scenario:
     """Load in and preprocess scenario variant tables."""
+
+<<<<<<< Updated upstream
+    def __init__(
+        self, region_filter, time_period, time, scenario_name, invariant_obj, pathway="none"
+    ):
+=======
     def __init__(self, scenario_name, invariant_obj, pathway="none"):
+>>>>>>> Stashed changes
         """Initialise functions and set class variables.
+
         Parameters
         ----------
+        time_period : bool
+            If NoHAM inputs split into AM, IP and PM
         scenario_name : str
             Full name of scenario.
         invariant_obj : class obj
@@ -18,6 +28,8 @@ class Scenario:
             Determines whether 'pathway' or standard scenario inputs are called in.
         """
         self.configuration = cf.ConfigParser(interpolation=cf.ExtendedInterpolation())
+        self.time_period = time_period
+        self.time = time
         self.type = "scenario"
         self.scenario_name = scenario_name
         self.invariant = invariant_obj
@@ -33,6 +45,19 @@ class Scenario:
             "Business As Usual High": "BAUH",
             "Business As Usual Low": "BAUL",
             "Accelerated EV Core": "AE",
+<<<<<<< Updated upstream
+            "Accelerated EV High": "AEH",
+            "Accelerated EV Low": "AEL",
+        }[self.scenario_name]
+        self.scenario_code = {
+            "BAU": "SC01",
+            "BAUH": "SC03",
+            "BAUL": "SC05",
+            "AE": "SC02",
+            "AEH": "SC04",
+            "AEL": "SC06",
+        }[self.scenario_initials]
+=======
             "Just About Managing": "JAM",
             "Prioritised Places": "PP",
             "Digitally Distributed": "DD",
@@ -44,26 +69,28 @@ class Scenario:
                               "UZC": "SC04",
                               "BAU": "SC05",
                               "AE": "SC06"}[self.scenario_initials]
+>>>>>>> Stashed changes
 
     def __load_scenario(self, pathway="none"):
         """Load in scenario tables."""
-        self.seg_share_of_year_type_sales = ut.new_load_scenario_tables(
-            self.scenario_name, "segSales_propOfTypeYear", suffix=pathway
+        self.seg_share_of_year_type_sales = ut.load_table(
+            self, "segSales_propOfTypeYear", suffix=pathway.capitalize()
         )
-        self.fuel_share_of_year_seg_sales = ut.new_load_scenario_tables(
-            self.scenario_name, "fuelSales_propOfSegYear", suffix=pathway
+        self.fuel_share_of_year_seg_sales = ut.load_table(
+            self, "fuelSales_propOfSegYear", suffix=pathway.capitalize()
         )
-        self.type_fleet_size_growth = ut.new_load_scenario_tables(
-            self.scenario_name, "fleetSize_totOfYear", suffix=pathway
+        self.type_fleet_size_growth = ut.load_table(
+            self, "fleetSize_totOfYear", suffix=pathway.capitalize()
         )
-        self.co2_reductions = ut.new_load_scenario_tables(self.scenario_name, "co2Reduction", suffix=pathway
-                                                          )
-        self.km_index_reductions = ut.new_load_scenario_tables(
-            self.scenario_name, "ChainageReduction", suffix=pathway
-        )
+<<<<<<< Updated upstream
+        self.co2_reductions = ut.load_table(self, "co2Reduction", suffix=pathway.capitalize())
+        self.km_index_reductions = ut.load_table(
+            self, "ChainageReduction", suffix=pathway.capitalize()
+=======
         self.co2_reductions = ut.new_load_scenario_tables(self.scenario_name, "co2Reduction", suffix=pathway)
         self.km_index_reductions = ut.new_load_scenario_tables(
             self.scenario_name, "ChainageReduction", suffix=pathway
+>>>>>>> Stashed changes
         )
         # File paths are different if the index year is 2015
         # Carry out some preprocessing so the tables are consistent with 2018 inputs
@@ -169,32 +196,111 @@ class Demand:
 
     def __load_car_demand(self):
         """Load the car demand for a specified scenario."""
+<<<<<<< Updated upstream
+        if self.time_period:
+            path = str(DEMAND_PATH) + f"/{self.scenario_code}/"
+
+            # Iterate through all model years loading and appending demand.
+            demand = pd.read_csv(
+                f"{path}vkm_by_speed_and_type_{self.index_year}_car_{self.time}.csv"
+            )
+            demand["year"] = self.index_year
+            for i in range(2020, 2055, 5):
+                x = pd.read_csv(f"{path}vkm_by_speed_and_type_{i}_car_{self.time}.csv")
+                x["year"] = i
+                demand = demand.append(x)
+
+        else:
+            path = str(DEMAND_PATH) + f"/{self.scenario_code}/"
+            # self.configuration["filePaths"]["DemandFile"]
+            # Iterate through all model years loading and appending demand.
+            demand = pd.read_csv(f"{path}vkm_by_speed_and_type_{self.index_year}_car.csv")
+            demand["year"] = self.index_year
+            for i in range(2020, 2055, 5):
+                x = pd.read_csv(f"{path}vkm_by_speed_and_type_{i}_car.csv")
+                x["year"] = i
+                demand = demand.append(x)
+            # Drop extra columns
+=======
         path = str(DEMAND_PATH) + f"/{self.scenario_code}/"
         # self.configuration["filePaths"]["DemandFile"]
         # Iterate through all model years loading and appending demand.
         demand = pd.read_hdf(f"{path}vkm_by_speed_and_type_{self.year}_{self.time_period}_car.h5", self.key
                              , mode="r")
         # Drop extra columns
+>>>>>>> Stashed changes
         car_demand = demand[demand.columns.drop(list(demand.filter(regex="perc_")))]
         return car_demand
 
     def __load_hgv_demand(self):
         """Load the hgv demand for a specified scenario."""
-        path = str(DEMAND_PATH) + f"/{self.scenario_code}/"
+        if self.time_period:
+            path = str(DEMAND_PATH) + f"/{self.scenario_code}/"
+
+            # Iterate through all model years loading and appending demand.
+            demand = pd.read_csv(
+                f"{path}vkm_by_speed_and_type_{self.index_year}_hgv_{self.time}.csv"
+            )
+            demand["year"] = self.index_year
+            for i in range(2020, 2055, 5):
+                x = pd.read_csv(f"{path}vkm_by_speed_and_type_{i}_hgv_{self.time}.csv")
+                x["year"] = i
+                demand = demand.append(x)
+        else:
+            path = str(DEMAND_PATH) + f"/{self.scenario_code}/"
+
+<<<<<<< Updated upstream
+            # Iterate through all model years loading and appending demand.
+            demand = pd.read_csv(f"{path}vkm_by_speed_and_type_{self.index_year}_hgv.csv")
+            demand["year"] = self.index_year
+            for i in range(2020, 2055, 5):
+                x = pd.read_csv(f"{path}vkm_by_speed_and_type_{i}_hgv.csv")
+                x["year"] = i
+                demand = demand.append(x)
+
+=======
         # Iterate through all model years loading and appending demand.
         demand = pd.read_hdf(f"{path}vkm_by_speed_and_type_{self.year}_{self.time_period}_hgv.h5", self.key,
                              mode="r")
+>>>>>>> Stashed changes
         # Drop extra columns
         hgv_demand = demand[demand.columns.drop(list(demand.filter(regex="perc_")))]
         return hgv_demand
 
     def __load_lgv_demand(self):
+<<<<<<< Updated upstream
+        """Load the NoHAM lgv demand for a specified scenario."""
+        if self.time_period:
+            path = str(DEMAND_PATH) + f"/{self.scenario_code}/"
+
+            # Iterate through all model years loading and appending demand.
+            demand = pd.read_csv(
+                f"{path}vkm_by_speed_and_type_{self.index_year}_lgv_{self.time}.csv"
+            )
+            demand["year"] = self.index_year
+            for i in range(2020, 2055, 5):
+                x = pd.read_csv(f"{path}vkm_by_speed_and_type_{i}_lgv_{self.time}.csv")
+                x["year"] = i
+                demand = demand.append(x)
+        else:
+            path = str(DEMAND_PATH) + f"/{self.scenario_code}/"
+
+            # Iterate through all model years loading and appending demand.
+            demand = pd.read_csv(f"{path}vkm_by_speed_and_type_{self.index_year}_lgv.csv")
+            demand["year"] = self.index_year
+            for i in range(2020, 2055, 5):
+                x = pd.read_csv(f"{path}vkm_by_speed_and_type_{i}_lgv.csv")
+                x["year"] = i
+                demand = demand.append(x)
+            # Drop extra columns
+=======
         """Load the lgv demand for a specified scenario."""
         path = str(DEMAND_PATH) + f"/{self.scenario_code}/"
 
         # Iterate through all model years loading and appending demand.
         demand = pd.read_hdf(f"{path}vkm_by_speed_and_type_{self.year}_{self.time_period}_lgv.h5", self.key,
                              mode="r")
+>>>>>>> Stashed changes
         lgv_demand = demand[demand.columns.drop(list(demand.filter(regex="perc_")))]
         return lgv_demand
 
@@ -270,7 +376,6 @@ class Demand:
         )
         demand["vkm"] = demand["vkm"] * demand["km_growth"]
         demand = demand.drop(columns=["km_growth"])
-        demand = demand[demand["vkm"] != 0]
         # references to road_type have been removed
         # demand.loc[demand["road_type"] == "motorway", "road_type"] = "Motorway"
         # demand.loc[demand["road_type"] == "urban", "road_type"] = "Urban"

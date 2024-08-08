@@ -19,7 +19,7 @@ class Rail:
                 outpath : str
                     Filepath to export preprocessed tables.
                 """
-        print("Initialising Rail Calculations")
+
         self.outpath = outpath
         self.configuration = config
         self.scenario = scenario_obj
@@ -30,20 +30,16 @@ class Rail:
             self.scheme_years[2]
         self.base_code, self.year2042_code, self.year2052_code = "IGX", "K1P", "K1Q"
 
-        self.projected_years = [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030, 2031, 2032,
-                                2033, 2034, 2035, 2036, 2037, 2038, 2039, 2040, 2041, 2042, 2043, 2044, 2045, 2046,
-                                2047, 2048, 2049, 2050, 2051]
-        # [2020, 2025, 2030, 2035, 2040, 2045, 2050]
+        self.projected_years = range(2019, 2051)
 
         self.__load_data()
         self.__calculate_base_emissions()
         self.__interpolate_future_emissions()
         self.__create_zonal_assignment()
         self.__create_regional_metrics()
-        print("Finalised rail emissions")
 
     def __load_data(self):
-
+        print("Initialising Rail Calculations")
         path = self.configuration["filePaths"]["NoRMSFile"]
         self.bus_emission = pd.read_csv(self.configuration["filePaths"]["busEmissionFile"])
         self.station_zones = pd.read_csv(self.configuration["filePaths"]["railStationNodes"])
@@ -105,8 +101,6 @@ class Rail:
         # scheme_emissions["g CO2 per passenger kilometre"] = 36.66  # to replace
         # scheme_emissions["g CO2"] = scheme_emissions["g CO2 per passenger kilometre"]\
         #     * scheme_emissions["VOL"] * scheme_emissions["DIST_KM"]
-
-
 
         scheme_emissions = scheme_emissions.merge(self.rail_emission, how="left", on="year")
         scheme_emissions["VCLASS"] = scheme_emissions["VCLASS"].astype(str)
@@ -189,3 +183,4 @@ class Rail:
 
     def __create_regional_metrics(self):
         temp = True
+        print("Finalised rail emissions")

@@ -1,59 +1,57 @@
 import configparser as cf
 import pandas as pd
-from caf.carbon import projection, scenario_dependent, scenario_invariant, output_figures
-from caf.carbon.load_data import REGION_FILTER, OUT_PATH
+
+# Local Imports
+from caf.carbon import (
+    output_figures,
+    projection,
+    scenario_dependent,
+    scenario_invariant,
+)
+from caf.carbon.load_data import REGION_FILTER, DEMAND_PATH
 
 
 class FleetEmissionsModel:
     """Calculate fleet emissions from fleet and demand data."""
+    def __init__(
+        self, regions, ev_redistribution,
+            scenario_list, run_fresh,
+            run_name, fleet_year,
+            pathway, ev_redistribution_fresh
+    ):
 
-    def __init__(self, regions, ev_redistribution, time_period, scenario_list, run_fresh, run_name):
         # %% Load config file
         region_filter = pd.read_csv(REGION_FILTER)
-        region_filter = region_filter[region_filter["region"].isin(regions)]
-
-        # Specify if NoHAM demand inputs are separated into AM, IP, PM time periods
-        if time_period:
-            time_period_list = ["AM", "IP", "PM"]
-        else:
-            time_period_list = ["aggregated"]
+        region_filter = region_filter[region_filter["stb_name"].isin(regions)]
 
         # %% Scenario Agnostic
-        index_fleet = scenario_invariant.IndexFleet(run_fresh)
-        index_fleet.fleet.to_csv("index fleet new.csv")
-        invariant_data = scenario_invariant.Invariant(index_fleet, time_period)
+        index_fleet = scenario_invariant.IndexFleet(run_fresh, fleet_year)
+        invariant_data = scenario_invariant.Invariant(index_fleet, fleet_year)
 
         # State whether you want to generate baseline projections or decarbonization
         # pathway projections
         pathway = "none"  # Options include "none", "element"
         # %% Scenario Dependent
-        for time in time_period_list:
-            for i in scenario_list:
-                print("\n\n\n###################")
-                print(i, time)
-                print("###################")
-                scenario = scenario_dependent.Scenario(
-                    region_filter, time_period, time, i, invariant_data, pathway
-                )
-                model = projection.Model(
-                    time,
-                    time_period,
-                    region_filter,
-                    invariant_data,
-                    scenario,
-                    ev_redistribution,
-                    run_name
-                )
-                model.allocate_chainage()
-                model.predict_emissions()
-                model.save_output()
 
-        # %% Save summary outputs and plots for all scenarios if demand not time period specific
-        if not time_period:
-            generate_outputs = False
-            if generate_outputs:
-                summary_outputs = output_figures.SummaryOutputs(
-                    time_period_list, pathway, invariant_data, model
-                )
-                summary_outputs.plot_effects()
-                summary_outputs.plot_fleet()
+        for i in scenario_list:
+            print("\n\n\n###################")
+            print(i)
+            print("###################")
+            scenario = scenario_dependent.Scenario(i, invariant_data, pathway)
+            model = projection.Model(
+                region_filter, invariant_data, scenario, ev_redistribution, run_name, ev_redistribution_fresh
+            )
+            ev_redistribution_fresh = False
+            self.first_enumeration = True
+            model.fleet_transform()
+            for year in [fleet_year, 2025, 2030, 2035, 2040, 2045, 2050]:
+                for time_period in ["TS1", "TS2", "TS3"]:
+                    keystoenum = pd.HDFStore(str(DEMAND_PATH) + f"/{scenario.scenario_code}/"
+                                             + f"vkm_by_speed_and_type_{year}_{time_period}_car.h5", mode="r").keys()
+                    for demand_key in keystoenum:
+                        demand_data = scenario_dependent.Demand(scenario, year, time_period, demand_key)
+                        model.allocate_emissions(demand_data, year, time_period, self.first_enumeration)
+                        print("5")
+                        if self.first_enumeration:
+                            print("enumeration changed")
+                            self.first_enumeration = False
