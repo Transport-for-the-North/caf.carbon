@@ -29,6 +29,7 @@ class Model:
         self.scenario = scenario_obj
         self.date = datetime.today().strftime("%Y_%m_%d")
         self.ev_redistribution = ev_redistribution
+        self.ev_redistribution_fresh = ev_redistribution_fresh
         self.region_filter = region_filter
         self.__predict_fleet_size()
         self.__create_future_fleet()
@@ -124,20 +125,18 @@ class Model:
     def __jump_forward(fleet_df, scrappage_df, fleet_sales_df, tally_df):
         """Transform a fleet into the next years fleet."""
 
-        def withdraw_cohort(fleet_df, scrappage_df, current_year):
+        def withdraw_cohort(fleet_to_withdraw, withdrawal_scrappage, withdrawal_year):
             """Increase cya by 1 and apply scrappage curve."""
-            fleet_df = fleet_df.copy()
-            fleet_df["cya"] = current_year - fleet_df["cohort"]
-            fleet_df = fleet_df.merge(scrappage_df, how="left", on=["cya", "vehicle_type"])
-            fleet_df["tally"] = fleet_df["tally"] * fleet_df["survival"]
-            fleet_df = fleet_df.dropna(subset=["tally"])
-            fleet_df = fleet_df.drop(columns=["survival", "cya"])
-            return fleet_df
+            fleet_df["cya"] = withdrawal_year - fleet_to_withdraw["cohort"]
+            fleet_to_withdraw = fleet_to_withdraw.merge(withdrawal_scrappage, how="left", on=["cya", "vehicle_type"])
+            fleet_to_withdraw["tally"] = fleet_to_withdraw["tally"] * fleet_to_withdraw["survival"]
+            fleet_to_withdraw = fleet_to_withdraw.dropna(subset=["tally"])
+            fleet_to_withdraw = fleet_to_withdraw.drop(columns=["survival", "cya"])
+            return fleet_to_withdraw
 
-        def inject_cohort(fleet_df, fleet_sales_df, tally_df, current_year):
+        def inject_cohort(fleet_to_inject, fleet_sales_injection, injection_tally, injection_year):
             """Add cya = 0 vehicles to match scenario defined fleet size."""
-            fleet_df = fleet_df.copy()
-            required_fleet = tally_df.loc[tally_df["year"] == current_year]
+            required_fleet = injection_tally.loc[injection_tally["year"] == injection_year]
             current_fleet = fleet_df.groupby("vehicle_type")["tally"].sum().reset_index()
             required_sales = current_fleet.merge(required_fleet, how="left", on="vehicle_type")
             # sales = scenario defined fleet size - current fleet size
@@ -145,14 +144,14 @@ class Model:
                 required_sales["fleet_forecast"] - required_sales["tally"]
             )
             required_sales = required_sales[["vehicle_type", "deficit"]]
-            new_cohort = fleet_sales_df.merge(required_sales, how="left", on=["vehicle_type"])
+            new_cohort = fleet_sales_injection.merge(required_sales, how="left", on=["vehicle_type"])
             new_cohort = new_cohort[new_cohort["cohort"] == current_year]
             # zone fuel segment sales = zone fuel segment share of type sales * type sales
             new_cohort["tally"] = new_cohort["sales_share"] * new_cohort["deficit"]
-            fleet_df = fleet_df._append(
-                new_cohort[["fuel", "segment", "cohort", "zone", "vehicle_type", "tally"]]
+            fleet_to_inject = pd.concat([fleet_to_inject, new_cohort[
+                ["fuel", "segment", "cohort", "zone", "vehicle_type", "tally"]]]
             )
-            return fleet_df
+            return fleet_to_inject
 
         current_year = fleet_df["cohort"].max() + 1
         fleet_df = withdraw_cohort(fleet_df, scrappage_df, current_year)
@@ -178,13 +177,13 @@ class Model:
             )
             print(f"\r{current_year}", end="\r")
             if current_year % 5 == 0:
-                fleet_useful_years = fleet_useful_years._append(fleet_df).fillna(current_year)
+                fleet_useful_years = fleet_useful_years.append(fleet_df).fillna(current_year)
 
         fleet_useful_years = fleet_useful_years[fleet_useful_years["tally"] > 0]
 
         if self.ev_redistribution:
             ev_projected_fleet = fleet_redistribution.Redistribution(
-                self.invariant, self.scenario, fleet_useful_years, True
+                self.invariant, self.scenario, fleet_useful_years, self.ev_redistribution_fresh
             ).projected_fleet
             self.projected_fleet = ev_projected_fleet
         else:
@@ -273,7 +272,8 @@ class Model:
             else:
                 emissions_data.to_hdf(
                     f"{self.outpath}/{self.run_name}_{self.scenario.scenario_initials}"
-                    f"_fleet_emissions_{self.date}.h5", f"{year}_{time_period}", mode='a', complevel=1, append=True, format="table",
+                    f"_fleet_emissions_{self.date}.h5", f"{year}_{time_period}", mode='a', complevel=1, append=True,
+                    format="table",
                     index=False,
                 )
                 print("Appending")
@@ -326,7 +326,7 @@ class Model:
         year_labels = []
         for i in range(len(bio_correction["switch_year"])):
             if i > 0:
-                year_labels._append(bio_correction["switch_year"].loc[i])
+                year_labels.append(bio_correction["switch_year"].loc[i])
 
         fleet["binned"] = pd.cut(fleet["year"], bins, labels=year_labels)
         fleet["biocorrection"] = 1.0
@@ -411,7 +411,6 @@ class Model:
         )
         fleet = fleet.rename(columns={"zone": "origin"})
         return fleet
-
 
     # def allocate_chainage(self):
     #     """Distribute the vehicle kms between fuel-segment-cohorts."""

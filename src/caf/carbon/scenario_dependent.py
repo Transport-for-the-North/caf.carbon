@@ -172,8 +172,8 @@ class Demand:
         path = str(DEMAND_PATH) + f"/{self.scenario_code}/"
         # self.configuration["filePaths"]["DemandFile"]
         # Iterate through all model years loading and appending demand.
-        demand = pd.read_hdf(f"{path}vkm_by_speed_and_type_{self.year}_{self.time_period}_car.h5", self.key
-                             , mode="r")
+        demand = pd.read_hdf(f"{path}vkm_by_speed_and_type_{self.year}_{self.time_period}_car.h5", self.key,
+                             mode="r")
         # Drop extra columns
         car_demand = demand[demand.columns.drop(list(demand.filter(regex="perc_")))]
         return car_demand

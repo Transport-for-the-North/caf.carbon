@@ -1,9 +1,7 @@
-import configparser as cf
 import pandas as pd
 
 # Local Imports
 from caf.carbon import (
-    output_figures,
     projection,
     scenario_dependent,
     scenario_invariant,
@@ -28,9 +26,6 @@ class FleetEmissionsModel:
         index_fleet = scenario_invariant.IndexFleet(run_fresh, fleet_year)
         invariant_data = scenario_invariant.Invariant(index_fleet, fleet_year)
 
-        # State whether you want to generate baseline projections or decarbonization
-        # pathway projections
-        pathway = "none"  # Options include "none", "element"
         # %% Scenario Dependent
 
         for i in scenario_list:
@@ -51,7 +46,6 @@ class FleetEmissionsModel:
                     for demand_key in keystoenum:
                         demand_data = scenario_dependent.Demand(scenario, year, time_period, demand_key)
                         model.allocate_emissions(demand_data, year, time_period, self.first_enumeration)
-                        print("5")
                         if self.first_enumeration:
                             print("enumeration changed")
                             self.first_enumeration = False

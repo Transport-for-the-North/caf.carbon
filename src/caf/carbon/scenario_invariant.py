@@ -9,12 +9,8 @@ from caf.carbon.load_data import (
     VEHICLE_PATH,
     POSTCODE_MSOA,
     DVLA_BODY,
-    MSOA_BODY,
-    MSOA_LAD,
-    NOHAM_TO_MSOA,
     MSOA_AREA_TYPE,
     TARGET_AREA_TYPE,
-    DEMAND_PATH,
     ANPR_DATA,
 )
 
@@ -354,10 +350,6 @@ class IndexFleet:
         fleet_archive = fleet_archive[
             fleet_archive["fuel"].isin(["diesel", "petrol", "phev", "bev", "hybrid", "hydrogen", "petrol hybrid"])]
         fleet_segmentation = pd.read_csv(DVLA_BODY)
-        # fleet_archive = fleet_archive.loc[(
-        #                                       fleet_archive["body_type_text"].isin(fleet_segmentation["body_type_text"]))
-        #                                   & (fleet_archive["wheelplan_text"].isin(fleet_segmentation["wheelplan_text"]))
-        #                                   ].reset_index(drop=True)
         fleet_archive = fleet_archive.merge(fleet_segmentation, how="left", on=["body_type_text", "wheelplan_text"])
         fleet_archive = fleet_archive.drop(columns=["wheelplan_text", "body_type_text"])
         fleet_archive = fleet_archive[~fleet_archive["zone"].isin(["zzDisposal", "zzUnknown"])]
@@ -534,8 +526,6 @@ class Invariant:
         index_fleet_obj : class obj
             Includes the fully preprocessed index fleet, partially
             preprocessed historic fleet and emission characteristics.
-        time_period : bool
-            If necessary, inputs split into AM, IP and PM
         """
         self.index_fleet = index_fleet_obj
         self.index_year = fleet_year
