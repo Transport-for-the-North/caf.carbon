@@ -41,10 +41,13 @@ class FleetEmissionsModel:
             model.fleet_transform()
             for year in [fleet_year, 2025, 2030, 2035, 2040, 2045, 2050]:
                 for time_period in ["TS1", "TS2", "TS3"]:
+                    print(f"Running {time_period} {year}")
                     keystoenum = pd.HDFStore(str(DEMAND_PATH) + f"/{scenario.scenario_code}/"
                                              + f"vkm_by_speed_and_type_{year}_{time_period}_car.h5", mode="r").keys()
                     for demand_key in keystoenum:
+                        print("Loading demand for key")
                         demand_data = scenario_dependent.Demand(scenario, year, time_period, demand_key)
+                        print("Allocating emissions for key")
                         model.allocate_emissions(demand_data, year, time_period, self.first_enumeration)
                         if self.first_enumeration:
                             print("enumeration changed")

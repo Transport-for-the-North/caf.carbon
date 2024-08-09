@@ -238,7 +238,7 @@ class Model:
             on="vehicle_type",  # ["vehicle_type", "road_type"]
             copy=False
         )
-        chainage["vkm"] = chainage["vkm"] * chainage["cya_prop_of_bt_rt"]
+        chainage["vkm"] *= chainage["cya_prop_of_bt_rt"]
         chainage["cya"] = chainage["cya"].astype(str)
         chainage = (
             chainage.groupby(["vehicle_type", "cya", "user_class", "origin", "destination",
@@ -246,25 +246,26 @@ class Model:
             .sum()
             .reset_index()
         )
-        print(time_period)
-        print(year)
         # component_no, component_size = 0, 20
         # unique_origins = self.unique_origins
-        for user_class in chainage["user_class"].unique():
+        for user_class in [["uc1"], ["uc2"], ["uc3"], ["uc4", "uc5"]]:
             print(user_class)
             fleet_component = self.projected_fleet[self.projected_fleet["year"] == year]
             fleet_component = fleet_component[fleet_component["origin"].isin(chainage["origin"])]
 
-            demand_component = chainage[chainage["user_class"] == user_class]
+            demand_component = chainage[chainage["user_class"].isin(user_class)]
+            print("userclass sent to emissions assignment")
             emissions_data = self.assign_chunk_emissions(
                 fleet_component, demand_component)
             """Save the final output (fleet + chainage + emissions)."""
             emissions_data["scenario"] = self.scenario.scenario_code
-
+            # fleet = fleet.merge( TODO may need to add this later for WSP
+            #     self.invariant.new_area_types[["zone", "msoa_area_type"]], how="left", on="zone", copy=False)
+            print("writing to file")
             if first_enumeration:
                 emissions_data.to_hdf(
                     f"{self.outpath}/{self.run_name}_{self.scenario.scenario_initials}"
-                    f"_fleet_emissions_{self.date}.h5", f"{year}_{time_period}", mode='w', complevel=1, format="table",
+                    f"_fleet_emissions_{self.date}.h5", f"{time_period}_{year}", mode='w', complevel=1, format="table",
                     index=False,
                 )
                 print("First enumerated")
@@ -272,41 +273,32 @@ class Model:
             else:
                 emissions_data.to_hdf(
                     f"{self.outpath}/{self.run_name}_{self.scenario.scenario_initials}"
-                    f"_fleet_emissions_{self.date}.h5", f"{year}_{time_period}", mode='a', complevel=1, append=True,
+                    f"_fleet_emissions_{self.date}.h5", f"{time_period}_{year}", mode='a', complevel=1, append=True,
                     format="table",
                     index=False,
                 )
                 print("Appending")
 
     def assign_chunk_emissions(self, fleet, demand):
-        fleet = fleet.rename(columns={"origin": "zone"})
-        demand = demand.rename(columns={"origin": "zone"})
-        fleet = fleet.set_index(["vehicle_type", "cya", "zone"])
-        demand = demand.set_index(["vehicle_type", "cya", "zone"])
+        # TODO bring all static emission factor operations prior to loop, biocorrection, efficiency reductions etc
+        fleet = fleet.set_index(["vehicle_type", "cya", "origin"])
+        demand = demand.set_index(["vehicle_type", "cya", "origin"])
+        print("indices renamed, merging fleet with demand")
         fleet = fleet.merge(
             demand, how="inner", left_index=True, right_index=True, copy=False
         )
+        print("resetting index")
         fleet = fleet.reset_index()
-        fleet = fleet.merge(
-            self.invariant.new_area_types[["zone", "msoa_area_type"]], how="left", on="zone", copy=False)
-        fleet = fleet.merge(
-            self.scenario.km_index_reductions,
-            how="left",
-            on=["year", "vehicle_type", "msoa_area_type"], copy=False
-        )
-        fleet["vkm"] = fleet["vkm"] * fleet["km_reduction"].fillna(0)
-        fleet = fleet.drop(
-            columns=["msoa_area_type", "km_reduction"]
-        )
         # Use tally share to distribute chainage
-        fleet["vkm"] = (
-                fleet["vkm"] * fleet["prop_by_fuel_seg_cohort"]
-        )
+        print("multiplying vkm by prop seg")
+        fleet["vkm"] *= fleet["prop_by_fuel_seg_cohort"]
+        #fleet["vkm"] = fleet["vkm"] * fleet["prop_by_fuel_seg_cohort"]
+
         # Apply scenario based nelum area type travel reductions
         fleet = fleet.drop(
             columns=["prop_by_fuel_seg_cohort"]
         )
-
+        print("applying emission curves")
         emission_change_df = self.invariant.yearly_co2_reduction.copy()
         se_curve = self.invariant.se_curve.copy().drop_duplicates()
 
@@ -319,52 +311,16 @@ class Model:
         )
         fleet = fleet.merge(emission_change_df, how="left", on=["cohort", "body_type"], copy=False)
         fleet["index_carbon_reduction"] = fleet["index_carbon_reduction"].fillna(1)
-
-        # petrol and diesel biofuel component reductions
-        bio_correction = self.invariant.biofuel_reduction
-        bins = bio_correction["switch_year"]
-        year_labels = []
-        for i in range(len(bio_correction["switch_year"])):
-            if i > 0:
-                year_labels.append(bio_correction["switch_year"].loc[i])
-
-        fleet["binned"] = pd.cut(fleet["year"], bins, labels=year_labels)
-        fleet["biocorrection"] = 1.0
-        for i in range(len(bio_correction["switch_year"])):
-            # petrol correction
-            fleet.loc[
-                (
-                        (fleet["fuel"] == "petrol")
-                        & (fleet["binned"] == bio_correction["switch_year"].loc[i])
-                ),
-                "biocorrection",
-            ] = bio_correction.loc[i]["petrol"]
-            # diesel correction
-            fleet.loc[
-                (
-                        (fleet["fuel"] == "diesel")
-                        & (fleet["binned"] == bio_correction["switch_year"].loc[i])
-                ),
-                "biocorrection",
-            ] = bio_correction.loc[i]["diesel"]
-
+        print("applying ghg factors")
         # GHG equivalents
         ghg_factor = self.invariant.ghg_equivalent
-        for i in range(len(ghg_factor)):
-            fleet.loc[
-                (
-                        (fleet["fuel"] == ghg_factor.loc[i]["fuel"])
-                        & (fleet["segment"] == ghg_factor.loc[i]["segment"])
-                ),
-                "ghg_factor",
-            ] = ghg_factor.loc[i]["factor"]
-
+        fleet = fleet.merge(ghg_factor, how="left", on=["fuel", "segment"])
         # CO2 = CO2/km * km
+        print("calculating tailpipe gco2")
         fleet["tailpipe_gco2"] = (
                 fleet["gco2/km"]
                 * fleet["index_carbon_reduction"]
                 * fleet["vkm"]
-                * fleet["biocorrection"]
                 * fleet["ghg_factor"]
         )
 
@@ -374,17 +330,19 @@ class Model:
             self.scenario.co2_reductions, on=["vehicle_type", "segment"], how="left"
         )
         fleet.loc[fleet.year < 2025, "co2_reduction"] = 0
-        fleet["tailpipe_gco2"] = fleet["tailpipe_gco2"] * (1 + fleet["co2_reduction"])
+        fleet["tailpipe_gco2"] *= (1 + fleet["co2_reduction"])
+        # fleet["tailpipe_gco2"] = fleet["tailpipe_gco2"] * (1 + fleet["co2_reduction"])
 
         # Calculate indirect emissions through the electricity grid
         fleet = (
             fleet.groupby(
-                ["fuel", "segment", "zone", "destination", "through", "user_class", "vehicle_type", "cohort",
+                ["fuel", "segment", "origin", "destination", "through", "user_class", "vehicle_type", "cohort",
                  "year", "trip_band", "tally"]
             )[["tailpipe_gco2", "vkm"]]
             .sum()
             .reset_index()
         )
+        print("calculating grid emissions")
         fleet = fleet.merge(
             self.invariant.grid_consumption,
             on=["cohort", "vehicle_type", "segment", "fuel"],
@@ -395,21 +353,20 @@ class Model:
         fleet["grid_gco2"] = fleet["kwh_consumption"] * fleet["gco2_kwh"]
         fleet = (
             fleet.groupby(
-                ["fuel", "segment", "zone", "destination", "through", "user_class", "vehicle_type", "cohort",
+                ["origin", "destination", "through", "fuel", "user_class", "vehicle_type",
                  "year", "trip_band", "tally"]
             )[["tailpipe_gco2", "grid_gco2", "vkm"]]
             .sum()
             .reset_index()
         )
 
-        merged_emissions = (
-            fleet.groupby(["vehicle_type", "year"])[
-                ["tailpipe_gco2", "grid_gco2", "vkm"]
-            ]
-            .sum()
-            .reset_index()
-        )
-        fleet = fleet.rename(columns={"zone": "origin"})
+        # merged_emissions = (
+        #     fleet.groupby(["vehicle_type", "year"])[
+        #         ["tailpipe_gco2", "grid_gco2", "vkm"]
+        #     ]
+        #     .sum()
+        #     .reset_index()
+        # )
         return fleet
 
     # def allocate_chainage(self):
