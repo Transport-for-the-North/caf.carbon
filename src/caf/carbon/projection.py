@@ -2,6 +2,7 @@ from datetime import datetime
 
 import pandas as pd
 import numpy as np
+import datetime
 
 from caf.carbon import utility as ut
 from caf.carbon import fleet_redistribution
@@ -27,7 +28,8 @@ class Model:
         self.run_name = run_name
         self.invariant = invariant_obj
         self.scenario = scenario_obj
-        self.date = datetime.today().strftime("%Y_%m_%d")
+        self.se_curve = self.invariant.se_curve
+        #self.date = datetime.today().strftime("%Y_%m_%d")
         self.ev_redistribution = ev_redistribution
         self.ev_redistribution_fresh = ev_redistribution_fresh
         self.region_filter = region_filter
@@ -189,10 +191,10 @@ class Model:
         else:
             self.projected_fleet = fleet_useful_years
 
-        if self.scenario.scenario_initials == "BAU":
-            fleet_useful_years.to_csv(
-                f"{self.outpath}/audit/projected_fleet_{self.date}.csv", index=False
-            )
+        # if self.scenario.scenario_initials == "BAU":
+        #     fleet_useful_years.to_csv(
+        #         f"{self.outpath}/audit/projected_fleet_{self.date}.csv", index=False
+        #     )
         print("\rProjection complete.\n")
         # Iterate through all model years loading and appending demand.
         self.projected_fleet = self.projected_fleet.loc[
@@ -222,6 +224,25 @@ class Model:
                                                           ].transform(
             "sum"
         )
+
+        se_curve = self.se_curve.copy().drop_duplicates()
+        se_curve = se_curve.merge(self.invariant.ghg_equivalent, how="left", on=["segment", "fuel"])
+        se_curve = se_curve.merge(self.scenario.co2_reductions, how="left", on=["segment", "vehicle_type"])
+        se_curve = se_curve.merge(self.invariant.yearly_co2_reduction, how="left", on=["segment", "e_cohort"])
+        se_curve["index_carbon_reduction"] = se_curve["index_carbon_reduction"].fillna(1)
+        se_curve["tailpipe_gco2"] = (se_curve["gco2/km"]
+                                     * se_curve["ghg_factor"]
+                                     * (1 + se_curve["co2_reduction"])
+                                     * se_curve["index_carbon_reduction"])
+        # se_curve = se_curve.set_index(["fuel", "segment", "e_cohort", "speed_band", "vehicle_type"])
+        self.se_curve = se_curve[["fuel", "segment", "e_cohort", "speed_band", "vehicle_type", "tailpipe_gco2"]]
+        grid_consumption = self.invariant.grid_consumption
+        grid_intensity = self.invariant.grid_intensity
+        grid_consumption["join"], grid_intensity["join"] = 1, 1
+        grid_emissions = grid_consumption.merge(grid_intensity, how="outer", on="join")
+        grid_emissions["grid_gco2"] = grid_emissions["kwh_km"] * grid_emissions["gco2_kwh"]
+        grid_emissions = grid_emissions[["cohort", "vehicle_type", "segment", "fuel", "year", "grid_gco2"]]
+        self.grid_emissions = grid_emissions
 
     def allocate_emissions(self, demand_data, year, time_period, first_enumeration):
         """Distribute the vehicle kms between fuel-segment-cohorts."""
@@ -280,77 +301,55 @@ class Model:
                 print("Appending")
 
     def assign_chunk_emissions(self, fleet, demand):
-        # TODO bring all static emission factor operations prior to loop, biocorrection, efficiency reductions etc
         fleet = fleet.set_index(["vehicle_type", "cya", "origin"])
         demand = demand.set_index(["vehicle_type", "cya", "origin"])
-        print("indices renamed, merging fleet with demand")
+        print("merging fleet with demand")
         fleet = fleet.merge(
             demand, how="inner", left_index=True, right_index=True, copy=False
-        )
-        print("resetting index")
-        fleet = fleet.reset_index()
+        )  # 30 seconds
+        fleet = fleet.reset_index()  # 6 seconds
         # Use tally share to distribute chainage
         print("multiplying vkm by prop seg")
         fleet["vkm"] *= fleet["prop_by_fuel_seg_cohort"]
-        #fleet["vkm"] = fleet["vkm"] * fleet["prop_by_fuel_seg_cohort"]
-
-        # Apply scenario based nelum area type travel reductions
+        print("dropping prop by fuel seg cohort")
         fleet = fleet.drop(
             columns=["prop_by_fuel_seg_cohort"]
-        )
-        print("applying emission curves")
-        emission_change_df = self.invariant.yearly_co2_reduction.copy()
-        se_curve = self.invariant.se_curve.copy().drop_duplicates()
-
+        )  # 7 seconds
         # All cohorts after the index year use the index year se curves with a scaling factor
         fleet["e_cohort"] = np.minimum(fleet["cohort"], self.invariant.index_year)
+        print("merge se curve with fleet")
+        print(datetime.datetime.now())
         fleet = fleet.merge(
-            se_curve,
+            self.se_curve,
             how="left",
             on=["fuel", "segment", "e_cohort", "speed_band", "vehicle_type"],
-        )
-        fleet = fleet.merge(emission_change_df, how="left", on=["cohort", "body_type"], copy=False)
-        fleet["index_carbon_reduction"] = fleet["index_carbon_reduction"].fillna(1)
-        print("applying ghg factors")
-        # GHG equivalents
-        ghg_factor = self.invariant.ghg_equivalent
-        fleet = fleet.merge(ghg_factor, how="left", on=["fuel", "segment"])
+            copy=False
+        )  # TODO 50 seconds
+        print(datetime.datetime.now())
         # CO2 = CO2/km * km
-        print("calculating tailpipe gco2")
-        fleet["tailpipe_gco2"] = (
-                fleet["gco2/km"]
-                * fleet["index_carbon_reduction"]
-                * fleet["vkm"]
-                * fleet["ghg_factor"]
-        )
-
-        # Apply reduction factors to relevant vehicles using evidence from the CCC 6th carbon budget
-        # Only apply them from 2025
-        fleet = fleet.merge(
-            self.scenario.co2_reductions, on=["vehicle_type", "segment"], how="left"
-        )
-        fleet.loc[fleet.year < 2025, "co2_reduction"] = 0
-        fleet["tailpipe_gco2"] *= (1 + fleet["co2_reduction"])
-        # fleet["tailpipe_gco2"] = fleet["tailpipe_gco2"] * (1 + fleet["co2_reduction"])
-
-        # Calculate indirect emissions through the electricity grid
+        fleet["tailpipe_gco2"] *= fleet["vkm"]
+        print("grouping and dropping columns")
+        print(datetime.datetime.now())
         fleet = (
             fleet.groupby(
                 ["fuel", "segment", "origin", "destination", "through", "user_class", "vehicle_type", "cohort",
                  "year", "trip_band", "tally"]
             )[["tailpipe_gco2", "vkm"]]
             .sum()
-            .reset_index()
-        )
+        )  # TODO 60 SECONDS
+        print(datetime.datetime.now())
+        # Calculate indirect emissions through the electricity grid
         print("calculating grid emissions")
-        fleet = fleet.merge(
-            self.invariant.grid_consumption,
-            on=["cohort", "vehicle_type", "segment", "fuel"],
-            how="left",
-        ).fillna(0)
-        fleet["kwh_consumption"] = fleet["kwh_km"] * fleet["vkm"]
-        fleet = fleet.merge(self.invariant.grid_intensity, on="year", how="left")
-        fleet["grid_gco2"] = fleet["kwh_consumption"] * fleet["gco2_kwh"]
+        fleet.to_csv("fleet1.csv")
+        fleet = pd.merge(fleet,
+                         self.grid_emissions,
+                         on=["cohort", "vehicle_type", "segment", "fuel", "year"],
+                         how="left",
+                         #copy=False
+                         ).fillna(0)  # TODO 30 seconds
+        fleet.to_csv("fleet2.csv")
+        fleet["grid_gco2"] *= fleet["vkm"]
+        print(datetime.datetime.now())
         fleet = (
             fleet.groupby(
                 ["origin", "destination", "through", "fuel", "user_class", "vehicle_type",
@@ -358,15 +357,7 @@ class Model:
             )[["tailpipe_gco2", "grid_gco2", "vkm"]]
             .sum()
             .reset_index()
-        )
-
-        # merged_emissions = (
-        #     fleet.groupby(["vehicle_type", "year"])[
-        #         ["tailpipe_gco2", "grid_gco2", "vkm"]
-        #     ]
-        #     .sum()
-        #     .reset_index()
-        # )
+        )  # 13 seconds
         return fleet
 
     # def allocate_chainage(self):

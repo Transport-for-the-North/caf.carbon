@@ -593,7 +593,7 @@ class Invariant:
         yearly_co2_reduction = pd.melt(
             self.yearly_co2_reduction,
             id_vars=["year"],
-            var_name=["body_type"],
+            var_name=["segment"],
             value_name="year_reduction_in_co2",
         )
         # Convert year-on-year change to proportion of previous year
@@ -602,11 +602,11 @@ class Invariant:
             1 + yearly_co2_reduction["year_reduction_in_co2"]
         )
         yearly_co2_reduction["index_carbon_reduction"] = yearly_co2_reduction.groupby(
-            "body_type"
+            "segment"
         )["year_reduction_in_co2"].cumprod()
-        yearly_co2_reduction["cohort"] = yearly_co2_reduction["year"]
+        yearly_co2_reduction["e_cohort"] = yearly_co2_reduction["year"]
         self.yearly_co2_reduction = yearly_co2_reduction[
-            ["cohort", "body_type", "index_carbon_reduction"]
+            ["e_cohort", "segment", "index_carbon_reduction"]
         ]
         naei_coefficients = self.naei_coefficients.copy()
         vehicle_classes = {
