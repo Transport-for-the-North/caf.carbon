@@ -14,7 +14,7 @@ def main():
     # or ["Just About Managing", "Prioritised Places", "Digitally Distributed", "Urban Zero Carbon"]
     scenarios = ["Business As Usual Core"]
     run_fresh = False
-    run_name = "TfN_caf_test"
+    run_name = "TfN_carbon_playbook"
 
     # Distribute EVs without income assumptions (False) or with income factors (True)?
     ev_redistribution = False
@@ -23,14 +23,16 @@ def main():
     run_vkm = False
     run_fleet = True
 
-    fleet_year = 2023
+    fleet_year = 2018
+    years_to_include = [fleet_year, 2028, 2038, 2043, 2048]  # years that appear in projected fleet and demand data
     # decarb pathway
     pathway = "none"  # Options include "none", "decarb", "old"
 
     # run the fleet emissions model
     if run_fleet:
         fleet_emission_model.FleetEmissionsModel(
-            regions, ev_redistribution, scenarios, run_fresh, run_name, fleet_year, pathway, ev_redistribution_fresh
+            regions, ev_redistribution, scenarios, run_fresh, run_name, fleet_year, pathway, ev_redistribution_fresh,
+            years_to_include
         )
     if run_vkm:
         vkm_emissions_model.VkmEmissionsModel(regions, scenarios)

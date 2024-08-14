@@ -5,6 +5,7 @@ from caf.carbon import (
     projection,
     scenario_dependent,
     scenario_invariant,
+    scenario_invariant_2018
 )
 from caf.carbon.load_data import REGION_FILTER, DEMAND_PATH
 
@@ -15,7 +16,8 @@ class FleetEmissionsModel:
         self, regions, ev_redistribution,
             scenario_list, run_fresh,
             run_name, fleet_year,
-            pathway, ev_redistribution_fresh
+            pathway, ev_redistribution_fresh,
+            years_to_include
     ):
 
         # %% Load config file
@@ -23,8 +25,12 @@ class FleetEmissionsModel:
         region_filter = region_filter[region_filter["stb_name"].isin(regions)]
 
         # %% Scenario Agnostic
-        index_fleet = scenario_invariant.IndexFleet(run_fresh, fleet_year)
-        invariant_data = scenario_invariant.Invariant(index_fleet, fleet_year)
+        if fleet_year == 2018:
+            index_fleet = scenario_invariant_2018.IndexFleet(run_fresh, fleet_year)
+            invariant_data = scenario_invariant_2018.Invariant(index_fleet, fleet_year)
+        else:
+            index_fleet = scenario_invariant.IndexFleet(run_fresh, fleet_year)
+            invariant_data = scenario_invariant.Invariant(index_fleet, fleet_year)
 
         # %% Scenario Dependent
 
@@ -38,8 +44,9 @@ class FleetEmissionsModel:
             )
             ev_redistribution_fresh = False
             self.first_enumeration = True
+            self.years_to_include = years_to_include
             model.fleet_transform()
-            for year in [fleet_year, 2025, 2030, 2035, 2040, 2045, 2050]:
+            for year in self.years_to_include:
                 for time_period in ["TS1", "TS2", "TS3"]:
                     print(f"Running {time_period} {year}")
                     keystoenum = pd.HDFStore(str(DEMAND_PATH) + f"/{scenario.scenario_code}/"

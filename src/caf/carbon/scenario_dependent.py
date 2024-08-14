@@ -47,28 +47,49 @@ class Scenario:
 
     def __load_scenario(self, pathway="none"):
         """Load in scenario tables."""
-        self.seg_share_of_year_type_sales = ut.new_load_scenario_tables(
-            self.scenario_name, "segSales_propOfTypeYear", suffix=pathway
-        )
-        self.fuel_share_of_year_seg_sales = ut.new_load_scenario_tables(
-            self.scenario_name, "fuelSales_propOfSegYear", suffix=pathway
-        )
-        self.type_fleet_size_growth = ut.new_load_scenario_tables(
-            self.scenario_name, "fleetSize_totOfYear", suffix=pathway
-        )
-        self.co2_reductions = ut.new_load_scenario_tables(self.scenario_name, "co2Reduction", suffix=pathway
-                                                          )
-        self.km_index_reductions = ut.new_load_scenario_tables(
-            self.scenario_name, "ChainageReduction", suffix=pathway
-        )
-        self.co2_reductions = ut.new_load_scenario_tables(self.scenario_name, "co2Reduction", suffix=pathway)
-        self.km_index_reductions = ut.new_load_scenario_tables(
-            self.scenario_name, "ChainageReduction", suffix=pathway
-        )
+        if self.index_year == 2018:
+            self.seg_share_of_year_type_sales = ut.load_scenario_tables(
+                self.scenario_name, "segSales_propOfTypeYear", suffix=pathway
+            )
+            self.fuel_share_of_year_seg_sales = ut.load_scenario_tables(
+                self.scenario_name, "fuelSales_propOfSegYear", suffix=pathway
+            )
+            self.type_fleet_size_growth = ut.load_scenario_tables(
+                self.scenario_name, "fleetSize_totOfYear", suffix=pathway
+            )
+            self.co2_reductions = ut.load_scenario_tables(self.scenario_name, "co2Reduction", suffix=pathway
+                                                              )
+            self.km_index_reductions = ut.load_scenario_tables(
+                self.scenario_name, "ChainageReduction", suffix=pathway
+            )
+            self.co2_reductions = ut.load_scenario_tables(self.scenario_name, "co2Reduction", suffix=pathway)
+            self.km_index_reductions = ut.load_scenario_tables(
+                self.scenario_name, "ChainageReduction", suffix=pathway
+            )
+        else:
+            self.seg_share_of_year_type_sales = ut.new_load_scenario_tables(
+                self.scenario_name, "segSales_propOfTypeYear", suffix=pathway
+            )
+            self.fuel_share_of_year_seg_sales = ut.new_load_scenario_tables(
+                self.scenario_name, "fuelSales_propOfSegYear", suffix=pathway
+            )
+            self.type_fleet_size_growth = ut.new_load_scenario_tables(
+                self.scenario_name, "fleetSize_totOfYear", suffix=pathway
+            )
+            self.co2_reductions = ut.new_load_scenario_tables(self.scenario_name, "co2Reduction", suffix=pathway
+                                                              )
+            self.km_index_reductions = ut.new_load_scenario_tables(
+                self.scenario_name, "ChainageReduction", suffix=pathway
+            )
+            self.co2_reductions = ut.new_load_scenario_tables(self.scenario_name, "co2Reduction", suffix=pathway)
+            self.km_index_reductions = ut.new_load_scenario_tables(
+                self.scenario_name, "ChainageReduction", suffix=pathway
+            )
         # File paths are different if the index year is 2015
         # Carry out some preprocessing so the tables are consistent with 2018 inputs
         if self.index_year == 2015:  # !
             seg_share_2015 = pd.read_csv(SEG_SHARE)
+            print(self.fuel_share_of_year_seg_sales)
             seg_share_2015.columns = ["segment", 2015]
             self.seg_share_of_year_type_sales = self.seg_share_of_year_type_sales.merge(
                 seg_share_2015, on="segment", how="left"
@@ -78,6 +99,7 @@ class Scenario:
             self.fuel_share_of_year_seg_sales = self.fuel_share_of_year_seg_sales.merge(
                 fuel_share_2015, on=["segment", "fuel"], how="left"
             )
+            print(self.fuel_share_of_year_seg_sales)
             self.seg_share_of_year_type_sales = self.seg_share_of_year_type_sales.fillna(0)
             self.fuel_share_of_year_seg_sales = self.fuel_share_of_year_seg_sales.fillna(0)
 
@@ -88,7 +110,6 @@ class Scenario:
             grouping_vars=["segment"],
             value_var="segment_sales_distribution",
         )
-
         self.fuel_share_of_year_seg_sales = ut.interpolate_timeline(
             self.fuel_share_of_year_seg_sales,
             grouping_vars=["segment", "fuel"],

@@ -6,6 +6,8 @@ output_figures.py
 hb_nhb_interpolation.py
 audit_tests.py
 Interpolator.py
+EV_summary.py
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -148,4 +150,5 @@ dmypy.json
 
 src/caf/carbon/2018/
 src/caf/carbon/functional analysis/
+src/caf/carbon/backup/
 CAFCarb/

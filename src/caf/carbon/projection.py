@@ -2,7 +2,6 @@ from datetime import datetime
 
 import pandas as pd
 import numpy as np
-import datetime
 
 from caf.carbon import utility as ut
 from caf.carbon import fleet_redistribution
@@ -178,7 +177,7 @@ class Model:
                 fleet_df, scrappage_df, fleet_sales_df, tally_df
             )
             print(f"\r{current_year}", end="\r")
-            if current_year % 5 == 0:
+            if current_year in self.FleetEmissionsModel.years_to_include:
                 fleet_useful_years = fleet_useful_years.append(fleet_df).fillna(current_year)
 
         fleet_useful_years = fleet_useful_years[fleet_useful_years["tally"] > 0]
