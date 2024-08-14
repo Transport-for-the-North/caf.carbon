@@ -45,9 +45,9 @@ class FleetEmissionsModel:
                     keystoenum = pd.HDFStore(str(DEMAND_PATH) + f"/{scenario.scenario_code}/"
                                              + f"vkm_by_speed_and_type_{year}_{time_period}_car.h5", mode="r").keys()
                     for demand_key in keystoenum:
-                        print("Loading demand for key")
+                        print(f"Processing demand for key {demand_key}")
                         demand_data = scenario_dependent.Demand(scenario, year, time_period, demand_key)
-                        print("Allocating emissions for key")
+                        print(f"Allocating emissions for key {demand_key}")
                         model.allocate_emissions(demand_data, year, time_period, self.first_enumeration)
                         if self.first_enumeration:
                             print("enumeration changed")

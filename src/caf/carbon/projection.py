@@ -29,7 +29,7 @@ class Model:
         self.invariant = invariant_obj
         self.scenario = scenario_obj
         self.se_curve = self.invariant.se_curve
-        #self.date = datetime.today().strftime("%Y_%m_%d")
+        self.date = datetime.today().strftime("%Y_%m_%d")
         self.ev_redistribution = ev_redistribution
         self.ev_redistribution_fresh = ev_redistribution_fresh
         self.region_filter = region_filter
@@ -191,10 +191,10 @@ class Model:
         else:
             self.projected_fleet = fleet_useful_years
 
-        # if self.scenario.scenario_initials == "BAU":
-        #     fleet_useful_years.to_csv(
-        #         f"{self.outpath}/audit/projected_fleet_{self.date}.csv", index=False
-        #     )
+        if self.scenario.scenario_initials == "BAU":
+            fleet_useful_years.to_csv(
+                f"{self.outpath}/audit/projected_fleet_{self.date}.csv", index=False
+            )
         print("\rProjection complete.\n")
         # Iterate through all model years loading and appending demand.
         self.projected_fleet = self.projected_fleet.loc[
@@ -223,6 +223,10 @@ class Model:
                                                               "tally"
                                                           ].transform(
             "sum"
+        )
+
+        self.projected_fleet = self.projected_fleet.drop(
+            columns=["body_type"]
         )
 
         se_curve = self.se_curve.copy().drop_duplicates()
@@ -270,7 +274,7 @@ class Model:
         # component_no, component_size = 0, 20
         # unique_origins = self.unique_origins
         for user_class in [["uc1"], ["uc2"], ["uc3"], ["uc4", "uc5"]]:
-            print(user_class)
+            print(user_class, end='\r')
             fleet_component = self.projected_fleet[self.projected_fleet["year"] == year]
             fleet_component = fleet_component[fleet_component["origin"].isin(chainage["origin"])]
 
@@ -282,7 +286,7 @@ class Model:
             emissions_data["scenario"] = self.scenario.scenario_code
             # fleet = fleet.merge( TODO may need to add this later for WSP
             #     self.invariant.new_area_types[["zone", "msoa_area_type"]], how="left", on="zone", copy=False)
-            print("writing to file")
+            print("writing to file", end='\r')
             if first_enumeration:
                 emissions_data.to_hdf(
                     f"{self.outpath}/{self.run_name}_{self.scenario.scenario_initials}"
@@ -298,38 +302,35 @@ class Model:
                     format="table",
                     index=False,
                 )
-                print("Appending")
+                print("Appending", end='\r')
 
     def assign_chunk_emissions(self, fleet, demand):
         fleet = fleet.set_index(["vehicle_type", "cya", "origin"])
         demand = demand.set_index(["vehicle_type", "cya", "origin"])
-        print("merging fleet with demand")
+        print("merging fleet with demand", end='\r')
         fleet = fleet.merge(
             demand, how="inner", left_index=True, right_index=True, copy=False
         )  # 30 seconds
         fleet = fleet.reset_index()  # 6 seconds
         # Use tally share to distribute chainage
-        print("multiplying vkm by prop seg")
+        print("multiplying vkm by prop seg", end='\r')
         fleet["vkm"] *= fleet["prop_by_fuel_seg_cohort"]
-        print("dropping prop by fuel seg cohort")
+        print("dropping prop by fuel seg cohort", end='\r')
         fleet = fleet.drop(
             columns=["prop_by_fuel_seg_cohort"]
         )  # 7 seconds
         # All cohorts after the index year use the index year se curves with a scaling factor
         fleet["e_cohort"] = np.minimum(fleet["cohort"], self.invariant.index_year)
-        print("merge se curve with fleet")
-        print(datetime.datetime.now())
+        print("merge se curve with fleet", end='\r')
         fleet = fleet.merge(
             self.se_curve,
             how="left",
             on=["fuel", "segment", "e_cohort", "speed_band", "vehicle_type"],
             copy=False
         )  # TODO 50 seconds
-        print(datetime.datetime.now())
         # CO2 = CO2/km * km
         fleet["tailpipe_gco2"] *= fleet["vkm"]
-        print("grouping and dropping columns")
-        print(datetime.datetime.now())
+        print("grouping and dropping columns", end='\r')
         fleet = (
             fleet.groupby(
                 ["fuel", "segment", "origin", "destination", "through", "user_class", "vehicle_type", "cohort",
@@ -337,19 +338,17 @@ class Model:
             )[["tailpipe_gco2", "vkm"]]
             .sum()
         )  # TODO 60 SECONDS
-        print(datetime.datetime.now())
         # Calculate indirect emissions through the electricity grid
-        print("calculating grid emissions")
-        fleet.to_csv("fleet1.csv")
-        fleet = pd.merge(fleet,
-                         self.grid_emissions,
+        print("calculating grid emissions", end='\r')
+        fleet = fleet.reset_index()
+        grid_emissions = self.grid_emissions
+        fleet = fleet.merge(
+                         grid_emissions,
                          on=["cohort", "vehicle_type", "segment", "fuel", "year"],
                          how="left",
-                         #copy=False
-                         ).fillna(0)  # TODO 30 seconds
-        fleet.to_csv("fleet2.csv")
+                         copy=False
+                         ).fillna(0)
         fleet["grid_gco2"] *= fleet["vkm"]
-        print(datetime.datetime.now())
         fleet = (
             fleet.groupby(
                 ["origin", "destination", "through", "fuel", "user_class", "vehicle_type",
