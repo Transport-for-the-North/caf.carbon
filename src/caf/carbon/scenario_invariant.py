@@ -763,7 +763,8 @@ class Invariant:
         anpr = anpr.rename(
             columns={"percentage": "cya_prop_of_bt_rt"}
         )  # Fuel Body Type and Road Type
-
+        anpr["cya"] = anpr["cya"].astype(str)
+        anpr = anpr.groupby(["body_type", "vehicle_type", "cya"], as_index=False).sum()
         self.anpr = anpr[
             ["body_type", "vehicle_type", "cya", "cya_prop_of_bt_rt"]  # "road_type",
         ]

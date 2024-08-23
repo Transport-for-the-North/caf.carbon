@@ -24,7 +24,7 @@ def main():
     run_fleet = True
 
     fleet_year = 2018
-    years_to_include = [fleet_year, 2028, 2038, 2043, 2048]  # years that appear in projected fleet and demand data
+    years_to_include = [2028, 2038, 2043]  # years that appear in projected fleet and demand data
     # decarb pathway
     pathway = "none"  # Options include "none", "decarb", "old"
 

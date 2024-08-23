@@ -40,13 +40,14 @@ class FleetEmissionsModel:
             print("###################")
             scenario = scenario_dependent.Scenario(i, invariant_data, pathway)
             model = projection.Model(
-                region_filter, invariant_data, scenario, ev_redistribution, run_name, ev_redistribution_fresh
+                region_filter, invariant_data, scenario, ev_redistribution,
+                run_name, ev_redistribution_fresh, years_to_include
             )
             ev_redistribution_fresh = False
-            self.first_enumeration = True
             self.years_to_include = years_to_include
             model.fleet_transform()
             for year in self.years_to_include:
+                self.first_enumeration = True
                 for time_period in ["TS1", "TS2", "TS3"]:
                     print(f"Running {time_period} {year}")
                     keystoenum = pd.HDFStore(str(DEMAND_PATH) + f"/{scenario.scenario_code}/"

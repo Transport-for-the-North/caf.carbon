@@ -12,7 +12,9 @@ class Model:
     """Predict emissions using emissions, demand and projected fleet data."""
 
     def __init__(
-        self, region_filter, invariant_obj, scenario_obj, ev_redistribution, run_name, ev_redistribution_fresh
+        self, region_filter, invariant_obj,
+            scenario_obj, ev_redistribution, run_name,
+            ev_redistribution_fresh, years_to_include
     ):
         """Initialise functions and set class variables.
 
@@ -29,6 +31,7 @@ class Model:
         self.scenario = scenario_obj
         self.se_curve = self.invariant.se_curve
         self.date = datetime.today().strftime("%Y_%m_%d")
+        self.years_to_include = years_to_include
         self.ev_redistribution = ev_redistribution
         self.ev_redistribution_fresh = ev_redistribution_fresh
         self.region_filter = region_filter
@@ -177,7 +180,7 @@ class Model:
                 fleet_df, scrappage_df, fleet_sales_df, tally_df
             )
             print(f"\r{current_year}", end="\r")
-            if current_year in self.FleetEmissionsModel.years_to_include:
+            if current_year in self.years_to_include:
                 fleet_useful_years = fleet_useful_years.append(fleet_df).fillna(current_year)
 
         fleet_useful_years = fleet_useful_years[fleet_useful_years["tally"] > 0]
@@ -253,31 +256,21 @@ class Model:
         # introduce vkm chunking, break apart fleet, loop over last three functions, concat on outputs only
         # Divide chainage by ANPR data, each cya is distributed part of the bodytype-roadtype chainage
         # loop on ts and uc
-        # merge on indices for memory efficiency, dask
-        demand = demand_data.demand
-        chainage = pd.merge(
-            self.invariant.anpr,
-            demand,
-            how="left",
-            on="vehicle_type",  # ["vehicle_type", "road_type"]
-            copy=False
-        )
-        chainage["vkm"] *= chainage["cya_prop_of_bt_rt"]
-        chainage["cya"] = chainage["cya"].astype(str)
-        chainage = (
-            chainage.groupby(["vehicle_type", "cya", "user_class", "origin", "destination",
-                              "through", "speed_band", "trip_band"])["vkm"]
-            .sum()
-            .reset_index()
-        )
+        # print("grouping demand")
+        # chainage = (
+        #     chainage.groupby(["vehicle_type", "cya", "user_class", "origin", "destination",
+        #                       "through", "speed_band", "trip_band"])["vkm"]
+        #     .sum()
+        #     .reset_index()
+        # )
         # component_no, component_size = 0, 20
         # unique_origins = self.unique_origins
-        for user_class in [["uc1"], ["uc2"], ["uc3"], ["uc4", "uc5"]]:
+        for user_class in [["uc1"], ["uc2"], ["uc3"], ["uc4"], ["uc5"]]:
             print(user_class, end='\r')
             fleet_component = self.projected_fleet[self.projected_fleet["year"] == year]
-            fleet_component = fleet_component[fleet_component["origin"].isin(chainage["origin"])]
+            fleet_component = fleet_component[fleet_component["origin"].isin(demand_data.demand["origin"])]
 
-            demand_component = chainage[chainage["user_class"].isin(user_class)]
+            demand_component = demand_data.demand[demand_data.demand["user_class"].isin(user_class)]
             print("userclass sent to emissions assignment")
             emissions_data = self.assign_chunk_emissions(
                 fleet_component, demand_component)
@@ -289,7 +282,7 @@ class Model:
             if first_enumeration:
                 emissions_data.to_hdf(
                     f"{self.outpath}/{self.run_name}_{self.scenario.scenario_initials}"
-                    f"_fleet_emissions_{self.date}.h5", f"{time_period}_{year}", mode='w', complevel=1, format="table",
+                    f"_fleet_emissions_{self.date}_{year}.h5", f"{time_period}_{year}", mode='w', complevel=1, format="table",
                     index=False,
                 )
                 print("First enumerated")
@@ -297,7 +290,7 @@ class Model:
             else:
                 emissions_data.to_hdf(
                     f"{self.outpath}/{self.run_name}_{self.scenario.scenario_initials}"
-                    f"_fleet_emissions_{self.date}.h5", f"{time_period}_{year}", mode='a', complevel=1, append=True,
+                    f"_fleet_emissions_{self.date}_{year}.h5", f"{time_period}_{year}", mode='a', complevel=1, append=True,
                     format="table",
                     index=False,
                 )
@@ -305,6 +298,15 @@ class Model:
 
     def assign_chunk_emissions(self, fleet, demand):
         fleet = fleet.set_index(["vehicle_type", "cya", "origin"])
+        demand = pd.merge(
+            self.invariant.anpr,
+            demand,
+            how="left",
+            on="vehicle_type",  # ["vehicle_type", "road_type"]
+            copy=False
+        )
+        demand["vkm"] *= demand["cya_prop_of_bt_rt"]
+        demand = demand.drop(columns=["cya_prop_of_bt_rt"])
         demand = demand.set_index(["vehicle_type", "cya", "origin"])
         print("merging fleet with demand", end='\r')
         fleet = fleet.merge(
