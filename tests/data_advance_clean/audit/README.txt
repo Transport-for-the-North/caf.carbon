@@ -1,0 +1,2 @@
+characteristics and index_fleet are ot used in this test but need to be in the file location so they are just the original official tables
+fleet_archive is a small carefully manufactored dataframe for testing purposes.
