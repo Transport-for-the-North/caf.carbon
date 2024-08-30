@@ -1,0 +1,15 @@
+emissions_files:
+  bau:
+    2018: playbook_emissions_config.yml
+    2028: playbook_emissions_config.yml
+    2038: playbook_emissions_config.yml
+    2043: playbook_emissions_config.yml
+    2048: playbook_emissions_config.yml
+  cas:
+    2018: playbook_emissions_config.yml
+    2028: playbook_emissions_config.yml
+    2038: playbook_emissions_config.yml
+    2043: playbook_emissions_config.yml
+    2048: playbook_emissions_config.yml
+area_type_lookup: G:\raw_data\WSP Carbon Playbook\WSP_final\msoa_reclassifications_england_v6.csv
+code_lookup: A:\QCR- assignments\03.Assignments\h5files\Other Inputs\North_through_lookup-MSOA11_lta.csv
