@@ -1,28 +1,82 @@
+# -*- coding: utf-8 -*-
+"""Produces Carbon Playbook emissions tables from CAF.carbon outputs."""
+
+##### IMPORTS #####
+
+# Built-Ins
+import pathlib
+
+# Third Party
+import caf.toolkit as ctk
 import pandas as pd
+import pydantic
+
+##### CONSTANTS #####
+
+TIME_PERIODS = ["TS1", "TS2", "TS3"]
+REQUIRED_YEARS = [2018, 2028, 2038, 2043, 2048]
+REQUIRED_SCENARIOS = ["bau", "cas"]
+CONFIG_PATH = pathlib.Path("playbook_emissions_config.yml")
+
+##### FUNCTIONS & CLASSES #####
+
+
+class PlaybookConfig(ctk.BaseConfig):
+    """Parameters for playbook process."""
+
+    emissions_files: dict[str, dict[int, pydantic.FilePath]]
+    area_type_lookup: pydantic.FilePath
+    code_lookup: pydantic.FilePath
+
+    years: list[int] = pydantic.Field(default_factory=lambda: REQUIRED_YEARS)
+
+    @pydantic.field_validator("emissions_files")
+    @classmethod
+    def _check_scenarios(
+        cls, value: dict[str, dict[int, pathlib.Path]]
+    ) -> dict[str, dict[int, pathlib.Path]]:
+        required = set(REQUIRED_SCENARIOS)
+        scenarios = set(value.keys())
+
+        missing = required - scenarios
+        if len(missing) > 0:
+            raise ValueError(f"missing emissions files for scenarios: {missing}")
+
+        return value
+
+    @pydantic.model_validator(mode="after")
+    def _check_years(self):
+        if set(self.years) != set(REQUIRED_YEARS):
+            raise ValueError(f"required years are {REQUIRED_YEARS}")
+
+        required = set(self.years)
+
+        for scenario, paths in self.emissions_files.items():
+            missing = required - set(paths.keys())
+            if len(missing) > 0:
+                raise ValueError(
+                    f"missing emissions files for '{scenario}' for years: {missing}"
+                )
+
+        return self
 
 
 class PlaybookProcess:
 
-    def __init__(self, emissions_file):
+    def __init__(self, parameters: PlaybookConfig):
         """Initialise functions and set class variables.
 
         Parameters
         ----------
         """
-        self.years_to_iter = [2018]
-        self.time_periods = ["TS1", "TS2", "TS3"]
-        self.out_date = "DD_MM_YYYY"
-        self.emissions_file = emissions_file
-        self.working_directory = "D:/GitHub/caf.carbon/CAFCarb/outputs/"
-        self.area_type_lookup = pd.read_csv(
-            r"G:\raw_data\WSP Carbon Playbook\WSP_final\msoa_reclassifications_england_v6.csv"
-        )
+        self.years_to_iter = parameters.years
+        self.time_periods = TIME_PERIODS
+        self.emissions_files = parameters.emissions_files
+        self.area_type_lookup = pd.read_csv(parameters.area_type_lookup)
         self.area_type_lookup = self.area_type_lookup[["MSOA11CD", "RUC_Class"]].rename(
             columns={"MSOA11CD": "origin", "RUC_Class": "Origin Place Type"}
         )
-        self.code_lookup = pd.read_csv(
-            r"A:\QCR- assignments\03.Assignments\h5files\Other Inputs\North_through_lookup-MSOA11_lta.csv"
-        )
+        self.code_lookup = pd.read_csv(parameters.code_lookup)
 
         self.run_analysis()
 
@@ -30,10 +84,7 @@ class PlaybookProcess:
         year_emissions_data = pd.DataFrame()
         for time_period in self.time_periods:
             emissions_data = pd.read_hdf(
-                f"{self.working_directory}/TfN_carbon_playbook_{scenario}"
-                f"_fleet_emissions_{self.out_date}.h5",
-                f"{time_period}_{year}",
-                mode="r",
+                self.emissions_files[scenario][year], f"{time_period}_{year}", mode="r"
             )
             emissions_data["time_period"] = time_period
             year_emissions_data = pd.concat([year_emissions_data, emissions_data])
@@ -398,12 +449,12 @@ class PlaybookProcess:
         )
         vkm_splits_ue.to_csv("vkm_splits_ue.csv")
 
-        co2_emissions = self.create_co2emissions(
+        co2_emissions = self.create_co2_emissions(
             emissions_2018, emissions_2028, emissions_2038, emissions_2043, emissions_2048
         )
         co2_emissions.to_csv("co2_emissions_bau.csv")
 
-        co2_emissions_ue = self.create_co2emissions(
+        co2_emissions_ue = self.create_co2_emissions(
             ue_emissions_2018,
             ue_emissions_2028,
             ue_emissions_2038,
@@ -411,3 +462,18 @@ class PlaybookProcess:
             ue_emissions_2048,
         )
         co2_emissions_ue.to_csv("co2_emissions_ue.csv")
+
+
+def _run():
+    try:
+        config = PlaybookConfig.load_yaml(CONFIG_PATH)
+    except pydantic.ValidationError as exc:
+        # SystemExit shows the error without the traceback
+        # which is clearer for validation errors
+        raise SystemExit(exc) from exc
+
+    PlaybookProcess(config)
+
+
+if __name__ == "__main__":
+    _run()
