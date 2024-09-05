@@ -32,10 +32,10 @@ def create_vehicle_type_component(vehicle_data, vehicle_name):
     # vehicle_data = vehicle_data[["through", "vehicle_type", "tailpipe_gco2", "grid_gco2"]]
     vehicle_data["Emissions (tCO2e)"] = vehicle_data["tailpipe_gco2"] + vehicle_data["grid_gco2"]
     vehicle_data["Emissions (tCO2e)"] = vehicle_data["Emissions (tCO2e)"] / (1000 * 1000)
-    vehicle_data = vehicle_data.rename(columns={"through": "LTA", "vehicle_type": "Vehicle"})
     vehicle_data.loc[vehicle_data["vehicle_type"] == "car", "vehicle_type"] = "Car"
     vehicle_data.loc[vehicle_data["vehicle_type"] == "lgv", "vehicle_type"] = "LGV"
     vehicle_data.loc[vehicle_data["vehicle_type"] == "hgv", "vehicle_type"] = "HGV"
+    vehicle_data = vehicle_data.rename(columns={"through": "LTA", "vehicle_type": "Vehicle"})
     vehicle_data = vehicle_data[["LTA", "Vehicle", "Emissions (tCO2e)"]].groupby(
         ["LTA", "Vehicle"], as_index=False).sum()
     vehicle_data.to_csv(output_dir + vehicle_name + "_Vehicle_Type.csv")
@@ -54,10 +54,10 @@ def create_place_type_component(type_data, type_name):
 
 def create_trip_length_component(trip_data, trip_name):
     # trip_data = trip_data[["origin", "destination", "through", "trip_band", "tailpipe_gco2", "grid_gco2"]]
-    trip_data["Emissions"] = trip_data["tailpipe_gco2"] + trip_data["grid_gco2"]
-    trip_data["Emissions"] = trip_data["Emissions"] / (1000 * 1000)
+    trip_data["Emissions (tCO2e)"] = trip_data["tailpipe_gco2"] + trip_data["grid_gco2"]
+    trip_data["Emissions (tCO2e)"] = trip_data["Emissions (tCO2e)"] / (1000 * 1000)
     trip_data = trip_data.rename(columns={"through": "LTA", "trip_band": "Trip Length"})
-    trip_data = trip_data[["LTA", "Trip Length", "Emissions"]].groupby(
+    trip_data = trip_data[["LTA", "Trip Length", "Emissions (tCO2e)"]].groupby(
         ["LTA", "Trip Length"], as_index=False).sum()
     trip_data.to_csv(output_dir + trip_name + "_Trip_Band.csv")
 
@@ -84,28 +84,23 @@ def create_genesis_component(genesis_data, genesis_name):
     genesis_data = genesis_data.rename(columns={"through": "LTA"})
     genesis_data = genesis_data[["LTA", "Genesis", "Emissions (tCO2e)"]].groupby(
         ["LTA", "Trip Length"], as_index=False).sum()
-    genesis_data.to_csv(output_dir + genesis_name + "_Trip_Band.csv")
+    genesis_data.to_csv(output_dir + genesis_name + "_Genesis.csv")
 
 
 def vkm_info_component(vkm_data, vkm_name):
     vkm_data.loc[vkm_data["fuel"] == "hydrogen", "fuel"] = "ZEV"
     vkm_data.loc[vkm_data["fuel"] == "bev", "fuel"] = "ZEV"
-    vkm_data_totals = vkm_data[["through", "year", "vehicle_type", "vkm"]].groupby(
+    vkm_data_totals = vkm_data[["through", "vehicle_type", "vkm"]].groupby(
         ["through", "year", "vehicle_type"], as_index=False).sum()
     vkm_data = vkm_data[vkm_data["fuel"] == "ZEV"]
-    vkm_data = vkm_data[["through", "year", "vkm"]].groupby(
+    vkm_data = vkm_data[["through", "vkm"]].groupby(
         ["through", "year"], as_index=False).sum()
     vkm_data_totals = vkm_data_totals.rename(columns={"vkm": "vkm_total"})
-    vkm_data = vkm_data.merge(vkm_data_totals, how="left", on=["through", "year", "vehicle_type"])
+    vkm_data = vkm_data.merge(vkm_data_totals, how="left", on=["through", "vehicle_type"])
     vkm_data = vkm_data.rename(columns={"through": "LTA"})
-    vkm_data = vkm_data[["LTA", "year", "vehicle_type", "vkm", "vkm_total"]].groupby(
-        ["LTA", "year", "vehicle_type"], as_index=False).sum()
-    vkm_data.to_csv(output_dir + vkm_name + "_vkm_info.csv")
-    # vkm_data["zev mileage"] = vkm_data["vkm"] / vkm_data["vkm_total"]
-    # vkm_data = vkm_data.rename(columns={"through": "LTA"})
-    # vkm_data = vkm_data[["LTA", "year", "zev mileage", "vehicle_type"]].groupby(
-    #     ["LTA", "year", "vehicle_type"], as_index=False).sum()
-    # transformed_vkm_data = vkm_data.pivot(index=["LTA", "year"], columns="vehicle_type", values="zev_mileage")
+    vkm_data = vkm_data[["LTA", "vehicle_type", "vkm", "vkm_total"]].groupby(
+        ["LTA", "vehicle_type"], as_index=False).sum()
+    vkm_data.to_csv(output_dir + vkm_name + "_VKM_Info.csv")
 
 
 def co2_info_component(co2_data, co2_name):
@@ -115,7 +110,7 @@ def co2_info_component(co2_data, co2_name):
     co2_data["Emissions (MtCO2e)"] = co2_data["Emissions (MtCO2e)"] / (1000 * 1000 * 1000 * 1000)
     co2_data = co2_data.rename(columns={"through": "LTA"})
     co2_data = co2_data[["LTA", "vehicle_type", "Emissions (MtCO2e)"]].groupby("LTA", as_index=False).sum()
-    co2_data.to_csv(output_dir + co2_name + "_co2_info.csv")
+    co2_data.to_csv(output_dir + co2_name + "_CO2_Info.csv")
 
 
 for path in Path(input_dir).glob("*.h5"):
