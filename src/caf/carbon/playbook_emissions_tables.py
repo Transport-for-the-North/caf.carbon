@@ -11,8 +11,9 @@ class PlaybookProcess:
         """
         self.time_periods = ["TS1", "TS2", "TS3"]
         self.out_date = "DD_MM_YYYY"
-        self.working_directory = r"A:/QCR- assignments/Data for WSP/"
-        self.car_factor, self.lgv_factor, self.hgv_factor = 0.006331, 0.0069166, 0.005161
+        self.working_directory = r"A:/QCR- assignments/Data for WSP/Proforma time periods"
+        self.output_directory = r"A:/QCR- assignments/Data for WSP/Final outputs"
+        self.car_factor, self.lgv_factor, self.hgv_factor = 0.01, 0.01, 0.01  # 2.37, 2.43, 0.65
         self.area_type_lookup = pd.read_csv(
             r"G:\raw_data\WSP Carbon Playbook\WSP_final\msoa_reclassifications_england_v6.csv")
         self.area_type_lookup = self.area_type_lookup[["MSOA11CD", "RUC_Class"]].rename(columns={
@@ -27,7 +28,7 @@ class PlaybookProcess:
         year_emissions_data = pd.DataFrame()
         for time_period in self.time_periods:
             emissions_data = pd.read_csv(f"{self.working_directory}/{scenario}_{year}_{time_period}__{file_name}.csv")
-            # emissions_data = emissions_data[emissions_data["LTA"] != 22]
+            emissions_data = emissions_data[emissions_data["LTA"] != 22]
             emissions_data["time_period"] = time_period
             year_emissions_data = pd.concat([year_emissions_data, emissions_data])
         through_lta = self.code_lookup[["lad", "through_name"]].rename(columns={"lad": "LTA"})
@@ -53,6 +54,9 @@ class PlaybookProcess:
             unsimulated_data["time_period"] = "TS4"
             year_data = pd.concat([day_data, unsimulated_data])
         else:
+            day_data.loc[day_data["vehicle_type"] == "car", target] = day_data[target] * self.car_factor
+            day_data.loc[day_data["vehicle_type"] == "lgv", target] = day_data[target] * self.lgv_factor
+            day_data.loc[day_data["vehicle_type"] == "hgv", target] = day_data[target] * self.hgv_factor
             year_data = day_data
         return year_data
 
@@ -105,7 +109,7 @@ class PlaybookProcess:
             ["LTA", "Purpose"], as_index=False).sum()
         purpose_2019 = self.lininterpol(purpose_2018, purpose_2028, 2018, 2028, 2019,
                                         ["Emissions (tCO2e)"])
-        purpose_2019.to_csv(r"A:\QCR- assignments\Data for WSP\2019 Purpose.csv")
+        purpose_2019.to_csv(rf"{self.output_directory}\2019 Purpose.csv")
 
         vehicle_2018 = self.read_cafcarb_output(2018, "bau", "Vehicle_Type")
         vehicle_2018 = self.apply_annualisation(vehicle_2018, ["Emissions (tCO2e)"])
@@ -119,7 +123,7 @@ class PlaybookProcess:
             ["LTA", "Vehicle"], as_index=False).sum()
         vehicle_2019 = self.lininterpol(vehicle_2018, vehicle_2028, 2018, 2028, 2019,
                                         ["Emissions (tCO2e)"])
-        vehicle_2019.to_csv(r"A:\QCR- assignments\Data for WSP\2019 Vehicle.csv")
+        vehicle_2019.to_csv(rf"{self.output_directory}\2019 Vehicle.csv")
 
         trip_length_2018 = self.read_cafcarb_output(2018, "bau", "Trip_Band")
         trip_length_2018 = self.apply_annualisation(trip_length_2018, ["Emissions (tCO2e)"])
@@ -131,7 +135,7 @@ class PlaybookProcess:
             ["LTA", "Trip Length"], as_index=False).sum()
         trip_length_2019 = self.lininterpol(trip_length_2018, trip_length_2028, 2018, 2028, 2019,
                                             ["Emissions (tCO2e)"])
-        trip_length_2019.to_csv(r"A:\QCR- assignments\Data for WSP\2019 Trip Length.csv")
+        trip_length_2019.to_csv(rf"{self.output_directory}\2019 Trip Length.csv")
 
         genesis_2018 = self.read_cafcarb_output(2018, "bau", "Genesis")
         genesis_2018 = self.apply_annualisation(genesis_2018, ["Emissions (tCO2e)"])
@@ -143,7 +147,7 @@ class PlaybookProcess:
             ["LTA", "Genesis"], as_index=False).sum()
         genesis_2019 = self.lininterpol(genesis_2018, genesis_2028, 2018, 2028, 2019,
                                         ["Emissions (tCO2e)"])
-        genesis_2019.to_csv(r"A:\QCR- assignments\Data for WSP\2019 Genesis.csv")
+        genesis_2019.to_csv(rf"{self.output_directory}\2019 Genesis.csv")
 
         type_2018 = self.read_cafcarb_output(2018, "bau", "Place_Type")
         type_2018 = self.apply_annualisation(type_2018, ["Emissions (tCO2e)"])
@@ -155,7 +159,7 @@ class PlaybookProcess:
             ["LTA", "Origin Place Type"], as_index=False).sum()
         type_2019 = self.lininterpol(type_2018, type_2028, 2018, 2028, 2019,
                                         ["Emissions (tCO2e)"])
-        type_2019.to_csv(r"A:\QCR- assignments\Data for WSP\2019 Origin Place Type.csv")
+        type_2019.to_csv(rf"{self.output_directory}\2019 Origin Place Type.csv")
 
         vehicle_2043 = self.read_cafcarb_output(2043, "bau", "Vehicle_Type")
         vehicle_2043 = self.apply_annualisation(vehicle_2043, ["Emissions (tCO2e)"])
@@ -169,7 +173,7 @@ class PlaybookProcess:
             ["LTA", "Vehicle"], as_index=False).sum()
         vehicle_2050 = self.lininterpol(vehicle_2043, vehicle_2048, 2043, 2048, 2050,
                                         ["Emissions (tCO2e)"])
-        vehicle_2050.to_csv(r"A:\QCR- assignments\Data for WSP\2050 Vehicle.csv")
+        vehicle_2050.to_csv(rf"{self.output_directory}\2050 Vehicle.csv")
 
         emissions_2018 = self.read_cafcarb_output(2018, "bau", "CO2_Info")
         emissions_2018 = self.apply_annualisation(emissions_2018, ["Emissions (MtCO2e)"])
@@ -219,7 +223,7 @@ class PlaybookProcess:
                                                  emissions_2043,
                                                  emissions_2048)
         co2_emissions = pd.pivot(co2_emissions, index="LTA", columns="year", values="Emissions (MtCO2e)")
-        co2_emissions.to_csv(r"A:\QCR- assignments\Data for WSP\co2_emissions_bau.csv")
+        co2_emissions.to_csv(rf"{self.output_directory}\co2_emissions_bau.csv")
 
         co2_emissions_ue = self.create_co2_emissions(ue_emissions_2018,
                                                     ue_emissions_2028,
@@ -227,7 +231,7 @@ class PlaybookProcess:
                                                     ue_emissions_2043,
                                                     ue_emissions_2048)
         co2_emissions_ue = pd.pivot(co2_emissions_ue, index="LTA", columns="year", values="Emissions (MtCO2e)")
-        co2_emissions_ue.to_csv(r"A:\QCR- assignments\Data for WSP\co2_emissions_ue.csv")
+        co2_emissions_ue.to_csv(rf"{self.output_directory}\co2_emissions_ue.csv")
 
         emissions_internal_2018 = self.read_cafcarb_output(2018, "bau", "Genesis")
         emissions_internal_2018 = emissions_internal_2018[emissions_internal_2018["Genesis"] == "Internal"].rename(columns={"Emissions (tCO2e)": "Emissions (MtCO2e)"})
@@ -302,7 +306,7 @@ class PlaybookProcess:
                                                      emissions_internal_2043,
                                                      emissions_internal_2048)
         co2_emissions = pd.pivot(co2_emissions, index="LTA", columns="year", values="Emissions (MtCO2e)")
-        co2_emissions.to_csv(r"A:\QCR- assignments\Data for WSP\co2_emissions_internal_bau.csv")
+        co2_emissions.to_csv(rf"{self.output_directory}\co2_emissions_internal_bau.csv")
 
         co2_emissions_internal_ue = self.create_co2_emissions(ue_emissions_internal_2018,
                                                     ue_emissions_internal_2028,
@@ -310,7 +314,7 @@ class PlaybookProcess:
                                                     ue_emissions_internal_2043,
                                                     ue_emissions_internal_2048)
         co2_emissions_internal_ue = pd.pivot(co2_emissions_internal_ue, index="LTA", columns="year", values="Emissions (MtCO2e)")
-        co2_emissions_internal_ue.to_csv(r"A:\QCR- assignments\Data for WSP\co2_emissions_internal_ue.csv")
+        co2_emissions_internal_ue.to_csv(rf"{self.output_directory}\co2_emissions_internal_ue.csv")
 
 
 PlaybookProcess()
