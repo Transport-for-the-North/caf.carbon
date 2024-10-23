@@ -1,0 +1,13 @@
+﻿cohort,vehicle_type,segment,fuel,year,grid_gco2
+2023,car,medium,bev,2024,80
+2023,car,medium,bev,2024,20
+2023,car,medium,bev,2029,2
+2023,car,medium,bev,2023,0.4
+2020,lgv,n1 class i,bev,2024,200
+2020,lgv,n1 class i,bev,2024,50
+2020,lgv,n1 class i,bev,2029,5
+2020,lgv,n1 class i,bev,2023,1
+2023,lgv,n1 class i,phev,2024,480
+2023,lgv,n1 class i,phev,2024,120
+2023,lgv,n1 class i,phev,2029,12
+2023,lgv,n1 class i,phev,2023,2.4
