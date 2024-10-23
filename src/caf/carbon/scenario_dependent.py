@@ -110,12 +110,13 @@ class Scenario:
             grouping_vars=["segment"],
             value_var="segment_sales_distribution",
         )
+        print(self.seg_share_of_year_type_sales)
         self.fuel_share_of_year_seg_sales = ut.interpolate_timeline(
             self.fuel_share_of_year_seg_sales,
             grouping_vars=["segment", "fuel"],
             value_var="segment_fuel_sales_distribution",
         )
-
+        print(self.fuel_share_of_year_seg_sales)
         # Set index year
         self.type_fleet_size_growth[self.index_year] = 0
         self.type_fleet_size_growth = pd.melt(
@@ -141,7 +142,7 @@ class Scenario:
         self.type_fleet_size_growth = self.type_fleet_size_growth[
             ["year", "vehicle_type", "index_fleet_growth"]
         ]
-
+        print(self.type_fleet_size_growth)
         self.km_index_reductions[self.index_year] = 0
         self.km_index_reductions = pd.melt(
             self.km_index_reductions,
@@ -153,7 +154,7 @@ class Scenario:
         self.km_index_reductions["year"] = self.km_index_reductions["year"].astype("int32")
         # Convert change in proportion of index year to proportion of index year
         self.km_index_reductions["km_reduction"] = 1 + self.km_index_reductions["km_reduction"]
-
+        print(self.km_index_reductions)
 
 class Demand:
     """Load in and preprocess scenario variant tables."""

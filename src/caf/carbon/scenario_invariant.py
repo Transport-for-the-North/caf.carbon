@@ -185,7 +185,7 @@ class CurveFitting:
             "{avg_co2}*12/44 /1000/{density}*100/{carbon_ef}*1000".format_map, axis=1
         ).map(eval)
         table_df["fc_in_use"] = table_df.apply(
-            "{params1} + {params2}*{avg_es} + {params3}*{avg_mass} + {params4}*{fc_approval}".format_map,
+            "{params1} + {params2}*{avg_cc} + {params3}*{avg_mass} + {params4}*{fc_approval}".format_map,
             axis=1,
         ).map(eval)
 
@@ -265,6 +265,7 @@ class CurveFitting:
         se_calcs.loc[se_calcs["max_speed"] < se_calcs["speed"], "gco2/km"] = 10e20
         se_calcs = se_calcs[grouping_vars + ["speed_band", "gco2/km"]]
         se_calcs = se_calcs.rename(columns={"cohort": "e_cohort"})
+        print(se_calcs)
         return se_calcs
 
 
@@ -274,7 +275,8 @@ class CurveFitting:
 class IndexFleet:
     """Load in and preprocess DfT Fleet data."""
 
-    def __init__(self, run_fresh, fleet_year):
+    def __init__(self, run_fresh, fleet_year, out_path=None):
+    #def __init__(self, run_fresh, fleet_year):
         """Initialise functions and set filepath to export tables.
 
         Parameters
@@ -284,7 +286,11 @@ class IndexFleet:
             or whether preprocessed tables are called in, thereby skipping
             preprocessing.
         """
-        self.outpath = OUT_PATH
+        if out_path is None:
+            self.outpath = OUT_PATH
+        else:
+            self.outpath = out_path
+
         if run_fresh:
             self.fleet_index_year = fleet_year
             self.__load_fleet()
@@ -380,7 +386,7 @@ class IndexFleet:
                 "year",
                 "avg_co2",
                 "avg_mass",
-                "avg_es",
+                "avg_cc",
                 "zone",
                 "vehicle_type",
                 "segment",

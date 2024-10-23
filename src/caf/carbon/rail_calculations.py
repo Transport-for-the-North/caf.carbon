@@ -1,5 +1,8 @@
+import configparser
+
 import pandas as pd
 import math
+from pathlib import Path
 
 import utility as ut
 
@@ -7,7 +10,7 @@ import utility as ut
 class Rail:
     """Calculate and predict rail base and current emissions using emissions, demand and service data."""
 
-    def __init__(self, config, scenario_obj, outpath):
+    def __init__(self, outpath):
         """Initialise functions and set class variables.
 
                 Parameters
@@ -21,31 +24,31 @@ class Rail:
                 """
 
         self.outpath = outpath
-        self.configuration = config
-        self.scenario = scenario_obj
+        #self.configuration = config
+        #self.scenario = scenario_obj
         # to be adjusted
-        self.run_name = "partner_preferred"
+        self.run_name = "NPR_Bradford_DS_NoCarb"
         self.scheme_years = [2018, 2042, 2052]
         self.base_year, self.year2042_year, self.year2052_year = self.scheme_years[0], self.scheme_years[1],\
             self.scheme_years[2]
-        self.base_code, self.year2042_code, self.year2052_code = "IGX", "K1P", "K1Q"
+        self.base_code, self.year2042_code, self.year2052_code = "SAM", "UCS", "UCT"
 
         self.projected_years = range(2019, 2051)
 
         self.__load_data()
         self.__calculate_base_emissions()
         self.__interpolate_future_emissions()
-        self.__create_zonal_assignment()
-        self.__create_regional_metrics()
+       # self.__create_zonal_assignment()
+        #self.__create_regional_metrics()
 
     def __load_data(self):
         print("Initialising Rail Calculations")
-        path = self.configuration["filePaths"]["NoRMSFile"]
-        self.bus_emission = pd.read_csv(self.configuration["filePaths"]["busEmissionFile"])
-        self.station_zones = pd.read_csv(self.configuration["filePaths"]["railStationNodes"])
-        self.rail_emission = pd.read_csv(self.configuration["filePaths"]["railEmissionFile"])
-        rail_vehicles = pd.read_csv(self.configuration["filePaths"]["vehicleDictionaryFile"])
-        rail_consumption = pd.read_csv(self.configuration["filePaths"]["railConsumptionFile"])
+        path = Path("E:/")/'GitHub'/'caf.carbon'/'NoCarb'/'Inputs'/'NoRMS'
+        self.bus_emission = pd.read_csv("%s/" % path+'bus_emission_curve.csv')
+        self.station_zones = pd.read_csv("%s/" % path+'TfN_Rail_Nodes.csv')
+        self.rail_emission = pd.read_csv("%s/" % path+'rail_emission_profiles.csv')
+        rail_vehicles = pd.read_csv("%s/" % path+'vehicles_dict.csv')
+        rail_consumption = pd.read_csv("%s/" % path+'rail_consumption_profiles.csv')
         # unit conversion from miles to kilometres
         rail_consumption["consumption rate"] = rail_consumption["consumption rate"] / 1.609344
         self.vehicle_consumption = rail_vehicles.merge(rail_consumption, how="left", on="vehicle type")
@@ -78,11 +81,11 @@ class Rail:
         self.scheme_combined = pd.concat([base, year2052])
         self.scheme_combined = pd.concat([self.scheme_combined, year2042])
 
-        pt_emission_index_reductions = pd.read_excel(
-            io=self.configuration["filePaths"]["scenarioFile"],
-            sheet_name=self.scenario,
-            header=1,
-            usecols=self.configuration["fileStructure"]["ptEmissionReduction"]).dropna()
+       # pt_emission_index_reductions = pd.read_excel(
+           # io=self.configuration["filePaths"]["scenarioFile"],
+           # sheet_name=self.scenario,
+           # header=1,
+           # usecols=self.configuration["fileStructure"]["ptEmissionReduction"]).dropna()
 
     def __speed_curve_emissions(self, vehicle_type, speed, dist):
         if vehicle_type == "Bus":
@@ -176,11 +179,11 @@ class Rail:
                                  self.run_name + ".csv")
         self.scheme_emissions = scheme_emissions
 
-    def __create_zonal_assignment(self):
-        station_zones = pd.read_csv(self.configuration["filePaths"]["railStationNodes"])
+    #def __create_zonal_assignment(self):
+      #  station_zones = pd.read_csv(self.configuration["filePaths"]["railStationNodes"])
         # od matrix on hold for now
-        temp = True
+       # temp = True
 
-    def __create_regional_metrics(self):
-        temp = True
-        print("Finalised rail emissions")
+   # def __create_regional_metrics(self):
+       # temp = True
+       # print("Finalised rail emissions")

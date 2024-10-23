@@ -332,7 +332,7 @@ class IndexFleet:
                 }
             )
 =======
-        """Read in the DfT fleet data for cars, vans and HGVs and concatenate."""
+        #"""Read in the DfT fleet data for cars, vans and HGVs and concatenate."""
         fleet_archive = pd.read_csv(VEHICLE_PATH)  # TODO replace with separate functionality of loading data
         fleet_archive = fleet_archive.rename(
             columns={
