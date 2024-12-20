@@ -65,7 +65,6 @@ class Imputation:
         reduced_fleet_df = fleet_df.loc[
             fleet_df["vehicle_type"] == vehicle_type, ["segment", "avg_mass"]
         ]
-        print(reduced_fleet_df["avg_mass"])
 
         if vehicle_type == "car":
             # Use the 25th percentile of mass for each car segment as the bin boundaries.
@@ -178,28 +177,36 @@ class CurveFitting:
     def characteristics_to_rwc(invariant_obj):
         """Calculate the real world correction factor of a vehicle using its emission characteristics."""
         characteristics = invariant_obj.index_fleet.characteristics.copy()
+        print("starting")
+        print(characteristics)
+        print(invariant_obj.real_world_coefficients)
         table_df = characteristics.merge(
             invariant_obj.real_world_coefficients, how="inner", on=["fuel", "vehicle_type"]
         )
+        print(table_df)
         table_df["fc_approval"] = table_df.apply(
             "{avg_co2}*12/44 /1000/{density}*100/{carbon_ef}*1000".format_map, axis=1
         ).map(eval)
+        print(table_df)
         table_df["fc_in_use"] = table_df.apply(
-            "{params1} + {params2}*{avg_es} + {params3}*{avg_mass} + {params4}*{fc_approval}".format_map,
+            "{params1} + {params2}*{avg_cc} + {params3}*{avg_mass} + {params4}*{fc_approval}".format_map,
             axis=1,
         ).map(eval)
+        print(table_df)
 
         table_df["rw_multiplier"] = table_df["fc_in_use"] / table_df["fc"]
         table_df = table_df[["cohort", "segment", "fuel", "vehicle_type", "rw_multiplier"]]
-
+        print(table_df)
         characteristics = characteristics[["cohort", "segment", "fuel", "vehicle_type"]]
         characteristics = ut.determine_fuel_type(characteristics)
+        print(characteristics)
         # If no real word correction can be calculated, set it as 1.
         characteristics = characteristics.merge(table_df, how="left").fillna(1)
         rw_multiplier = characteristics.merge(
             invariant_obj.fuel_characteristics, how="left", on="fuel"
         )
         # PHEVs operate in electric mode 50% of the time.
+        rw_multiplier.to_csv("rw_multi.csv")
         rw_multiplier.loc[rw_multiplier["fuel_type"] == "phev", "rw_multiplier"] = (
             rw_multiplier["rw_multiplier"] * 0.5
         )
@@ -307,7 +314,7 @@ class IndexFleet:
                 "Fuel Type": "Fuel",
                 "Body Type Text": "BodyTypeText",
                 "Vehicle_Type": "VehicleType",
-                "AvgCC": "AvgES",
+                #"AvgCC": "AvgES",
             }
         )
 
@@ -380,7 +387,7 @@ class IndexFleet:
                 "year",
                 "avg_co2",
                 "avg_mass",
-                "avg_es",
+                "avg_cc",
                 "zone",
                 "vehicle_type",
                 "segment",

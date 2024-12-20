@@ -47,8 +47,17 @@ DEMAND_DATA: Path = Path(os.getenv("DEMAND_DATA", DEFAULT))
 LINK_DATA: Path = Path(os.getenv("LINK_DATA", DEFAULT))
 DEMAND_OUT_PATH: Path = Path(os.getenv("DEMAND_OUT_PATH", DEFAULT))
 
+# vkm preprocessing
+CODE_LOOKUP: Path = Path(os.getenv("CODE_LOOKUP", DEFAULT))
+VKM_INPUT_FOLDER: Path = Path(os.getenv("VKM_INPUT_FOLDER", DEFAULT))
+
 # vkm emissions tool data
-BATCHED_PROCESSING_FILE: Path = Path(os.getenv("BATCHED_PROCESSING_FILE", DEFAULT))
+VKM_MODEL_DEMAND: Path = Path(os.getenv("VKM_MODEL_DEMAND", DEFAULT))
+VKM_DEMAND_OUT_PATH: Path = Path(os.getenv("VKM_DEMAND_OUT_PATH", DEFAULT))
+VKM_ZONE_CODE_LOOKUP: Path = Path(os.getenv("VKM_ZONE_CODE_LOOKUP", DEFAULT))
+GRID_EMISSIONS_PROFILES: Path = Path(os.getenv("GRID_EMISSIONS_PROFILES", DEFAULT))
+TAIL_PIPE_EMISSIONS_PROFILES: Path = Path(os.getenv("TAIL_PIPE_EMISSIONS_PROFILES", DEFAULT))
+INDEX_FLEET: Path = Path(os.getenv("INDEX_FLEET", DEFAULT))
 
 # new DVLA data
 VEHICLE_PATH: Path = Path(os.getenv("VEHICLE_PATH", DEFAULT))

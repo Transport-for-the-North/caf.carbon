@@ -11,7 +11,8 @@ from load_data import (
 
 
 class Demand:
-    """Predict emissions using emissions, demand and projected fleet data."""
+    """Used to process raw saturn data from RTMs or highway models into a format suitable for the
+    fleet model."""
 
     def __init__(self, available_years):
         """Initialise functions and set class variables."""
