@@ -272,6 +272,7 @@ class CurveFitting:
         se_calcs.loc[se_calcs["max_speed"] < se_calcs["speed"], "gco2/km"] = 10e20
         se_calcs = se_calcs[grouping_vars + ["speed_band", "gco2/km"]]
         se_calcs = se_calcs.rename(columns={"cohort": "e_cohort"})
+        print(se_calcs)
         return se_calcs
 
 
@@ -281,7 +282,8 @@ class CurveFitting:
 class IndexFleet:
     """Load in and preprocess DfT Fleet data."""
 
-    def __init__(self, run_fresh, fleet_year):
+    def __init__(self, run_fresh, fleet_year, out_path=None):
+    #def __init__(self, run_fresh, fleet_year):
         """Initialise functions and set filepath to export tables.
 
         Parameters
@@ -291,7 +293,11 @@ class IndexFleet:
             or whether preprocessed tables are called in, thereby skipping
             preprocessing.
         """
-        self.outpath = OUT_PATH
+        if out_path is None:
+            self.outpath = OUT_PATH
+        else:
+            self.outpath = out_path
+
         if run_fresh:
             self.fleet_index_year = fleet_year
             self.__load_fleet()
