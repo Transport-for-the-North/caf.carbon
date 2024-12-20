@@ -1,0 +1,85 @@
+zone,segment,cohort,fuel,vehicle_type,sales_share
+E02000001,medium,2023,bev,car,0.02
+E02000001,medium,2024,bev,car,0.027083333
+E02000001,medium,2025,bev,car,0.035
+E02000001,medium,2026,bev,car,0.04224
+E02000001,medium,2027,bev,car,0.04956
+E02000001,medium,2028,bev,car,0.05696
+E02000001,medium,2029,bev,car,0.06444
+E02000001,medium,2030,bev,car,0.072
+E02000001,medium,2031,bev,car,0.0724
+E02000001,medium,2032,bev,car,0.0728
+E02000001,medium,2033,bev,car,0.0732
+E02000001,medium,2034,bev,car,0.0736
+E02000001,medium,2035,bev,car,0.074
+E02000001,medium,2036,bev,car,0.0744
+E02000001,medium,2037,bev,car,0.0748
+E02000001,medium,2038,bev,car,0.0752
+E02000001,medium,2039,bev,car,0.0756
+E02000001,medium,2040,bev,car,0.076
+E02000001,medium,2041,bev,car,0.0764
+E02000001,medium,2042,bev,car,0.0768
+E02000001,medium,2043,bev,car,0.0772
+E02000001,medium,2044,bev,car,0.0776
+E02000001,medium,2045,bev,car,0.078
+E02000001,medium,2046,bev,car,0.0784
+E02000001,medium,2047,bev,car,0.0788
+E02000001,medium,2048,bev,car,0.0792
+E02000001,medium,2049,bev,car,0.0796
+E02000001,medium,2050,bev,car,0.08
+E02000002,medium,2023,bev,car,0.01
+E02000002,medium,2024,bev,car,0.013541667
+E02000002,medium,2025,bev,car,0.0175
+E02000002,medium,2026,bev,car,0.02112
+E02000002,medium,2027,bev,car,0.02478
+E02000002,medium,2028,bev,car,0.02848
+E02000002,medium,2029,bev,car,0.03222
+E02000002,medium,2030,bev,car,0.036
+E02000002,medium,2031,bev,car,0.0362
+E02000002,medium,2032,bev,car,0.0364
+E02000002,medium,2033,bev,car,0.0366
+E02000002,medium,2034,bev,car,0.0368
+E02000002,medium,2035,bev,car,0.037
+E02000002,medium,2036,bev,car,0.0372
+E02000002,medium,2037,bev,car,0.0374
+E02000002,medium,2038,bev,car,0.0376
+E02000002,medium,2039,bev,car,0.0378
+E02000002,medium,2040,bev,car,0.038
+E02000002,medium,2041,bev,car,0.0382
+E02000002,medium,2042,bev,car,0.0384
+E02000002,medium,2043,bev,car,0.0386
+E02000002,medium,2044,bev,car,0.0388
+E02000002,medium,2045,bev,car,0.039
+E02000002,medium,2046,bev,car,0.0392
+E02000002,medium,2047,bev,car,0.0394
+E02000002,medium,2048,bev,car,0.0396
+E02000002,medium,2049,bev,car,0.0398
+E02000002,medium,2050,bev,car,0.04
+E02000003,n1 class i,2023,phev,lgv,0.02
+E02000003,n1 class i,2024,phev,lgv,0.02
+E02000003,n1 class i,2025,phev,lgv,0.02
+E02000003,n1 class i,2026,phev,lgv,0.024
+E02000003,n1 class i,2027,phev,lgv,0.028
+E02000003,n1 class i,2028,phev,lgv,0.032
+E02000003,n1 class i,2029,phev,lgv,0.036
+E02000003,n1 class i,2030,phev,lgv,0.04
+E02000003,n1 class i,2031,phev,lgv,0.044
+E02000003,n1 class i,2032,phev,lgv,0.048
+E02000003,n1 class i,2033,phev,lgv,0.052
+E02000003,n1 class i,2034,phev,lgv,0.056
+E02000003,n1 class i,2035,phev,lgv,0.06
+E02000003,n1 class i,2036,phev,lgv,0.064
+E02000003,n1 class i,2037,phev,lgv,0.068
+E02000003,n1 class i,2038,phev,lgv,0.072
+E02000003,n1 class i,2039,phev,lgv,0.076
+E02000003,n1 class i,2040,phev,lgv,0.08
+E02000003,n1 class i,2041,phev,lgv,0.08
+E02000003,n1 class i,2042,phev,lgv,0.08
+E02000003,n1 class i,2043,phev,lgv,0.08
+E02000003,n1 class i,2044,phev,lgv,0.08
+E02000003,n1 class i,2045,phev,lgv,0.08
+E02000003,n1 class i,2046,phev,lgv,0.08
+E02000003,n1 class i,2047,phev,lgv,0.08
+E02000003,n1 class i,2048,phev,lgv,0.08
+E02000003,n1 class i,2049,phev,lgv,0.08
+E02000003,n1 class i,2050,phev,lgv,0.08

@@ -16,8 +16,9 @@ segSales_propOfTypeYear: A:I
 fuelSales_propOfSegYear: K:T
 fleetSize_totOfYear: V:AC
 ptEmissionReduction: AE:AL
-co2Reduction: AN:AP
-ChainageReduction: AR:AZ
+chainageReduction: AN:AV
+co2Reduction: AX:AZ
+nohamChainageReduction: BB:BJ
 
 #generalFile
 realWorldAttributes: A:I
@@ -35,33 +36,44 @@ gridCarbonIntensity: H:J
 #######################################################################
 [fileNames]
 #######################################################################
-fleetLocation: CAFCarb/fleet/
+fleetLocation: NoCarb/fleet/
 carFile: Cars by LAD from 2003 - 200507.csv
 lgvFile: LGVs by LAD from 2003 - 200507.csv
 hgvFile: Goods by LAD from 2003 - 200507.csv
 
-lookupLocation: CAFCarb/lookup/
+lookupLocation: NoCarb/lookup/
 msoaLADFile: MSOA_LAD_lookup.csv
+msoaNELUMFile: MSOA_NELUM_lookup.csv
+normsLADFile: norms_2018_lads20_pop_weight.xlsx
 msoaBodyFile: Bodytype by MSOA - 200507.csv
 anprFile: ANPR_data_North.xlsx
 naeiFile: NAEI - Emissions factors.csv
+nelumAreaTypeFile: NELUM Area Types and Population.csv
 msoaAreaTypeFile: areaTypesMSOA.csv
-newAreaTypes: New Area Types.csv
 nohamAreaTypeFile: noham_area_types.csv
-travellerTypes: tfn_traveller_type.csv
+railStationNodes: TfN_Rail_Nodes.csv
 
-inputLocation: CAFCarb/input/
-scenarioFile: scenario_tables_DfT_CAS.xlsx
+inputLocation: NoCarb/input/
+scenarioFile: scenario_tables_no_ev.xlsx
 scenarioPathway: scenario_tables_pathway.xlsx
+scenarioElement: scenario_tables_element.xlsx
 generalFile: general_tables.xlsx
 populationFile: export_zonal_population.xlsx
 gridCo2File: grid_consumption_intensity.xlsx
-nohamtomsoaFile: noham_msoa_pop_weighted_lookup.csv
-popDemographics: output_6_resi_gb_msoa_tfn_tt_prt_2018_pop.pbz2
+nohamtomsoaFile: noham_to_msoa/noham_msoa_pop_weighted_lookup.csv
+nohamPop: noham_to_msoa/noham_pop.csv
 
-demandLocation: CAFCarb/input/demand/
+demandLocation: NoCarb/input/demand NELUM/
+NoHAMdemandLocation: NoCarb/input/demand NoHAM/
+gvDemandFile: HGV_van_growth.xlsx
 
-EVFleetWeights: CAFCarb/input/zonal modifications/
+EVFleetWeights: NoCarb/input/zonal modifications/
+
+NoRMS: NoCarb/Inputs/NoRMS/
+railConsumption: emission_profiles/rail_consumption_profiles.csv
+railEmission: emission_profiles/rail_emission_profiles.csv
+vehicleDictionary: emission_profiles/vehicles_dict.csv
+busEmissions: emission_profiles/bus_emission_curve.csv
 
 #######################################################################
 [filePaths]
@@ -74,21 +86,35 @@ lgvFile: ${fileNames:fleetLocation}${fileNames:lgvFile}
 hgvFile: ${fileNames:fleetLocation}${fileNames:hgvFile}
 
 msoaLADFile: ${fileNames:lookupLocation}${fileNames:msoaLADFile}
+normsLADFile: ${fileNames:lookupLocation}${fileNames:normsLADFile}
+msoaNELUMFile: ${fileNames:lookupLocation}${fileNames:msoaNELUMFile}
 msoaBodyFile: ${fileNames:lookupLocation}${fileNames:msoaBodyFile}
 anprFile: ${fileNames:lookupLocation}${fileNames:anprFile}
 naeiFile: ${fileNames:lookupLocation}${fileNames:naeiFile}
+nelumAreaTypeFile: ${fileNames:lookupLocation}${fileNames:nelumAreaTypeFile}
 msoaAreaTypeFile: ${fileNames:lookupLocation}${fileNames:msoaAreaTypeFile}
-newAreaTypes: ${fileNames:lookupLocation}${fileNames:newAreaTypes}
-travellerClassification: ${fileNames:lookupLocation}${fileNames:travellerTypes}
 nohamAreaTypeFile: ${fileNames:lookupLocation}${fileNames:nohamAreaTypeFile}
+railStationNodes: ${fileNames:lookupLocation}${fileNames:railStationNodes}
 
 scenarioFile: ${fileNames:inputLocation}${fileNames:scenarioFile}
 scenarioPathway: ${fileNames:inputLocation}${fileNames:scenarioPathway}
-demographicsFile: ${fileNames:inputLocation}${fileNames:popDemographics}
+scenarioElement: ${fileNames:inputLocation}${fileNames:scenarioElement}
+
 generalFile: ${fileNames:inputLocation}${fileNames:generalFile}
 populationFile: ${fileNames:inputLocation}${fileNames:populationFile}
+
 msoaNoHAMFile: ${fileNames:inputLocation}${fileNames:nohamtomsoaFile}
+nohamPop: ${fileNames:inputLocation}${fileNames:nohamPop}
+
 gridCo2File: ${fileNames:inputLocation}${fileNames:gridCo2File}
 
-DemandFile: ${fileNames:demandLocation}
+carDemandFile: ${fileNames:demandLocation}
+gvDemandFile: ${fileNames:demandLocation}${fileNames:gvDemandFile}
+NoHAMDemandFile: ${fileNames:NoHAMdemandLocation}
 EVWeightFile: ${fileNames:EVFleetWeights}
+
+NoRMSFile: ${fileNames:NoRMS}
+railConsumptionFile: ${fileNames:NoRMS}${fileNames:railConsumption}
+railEmissionFile: ${fileNames:NoRMS}${fileNames:railEmission}
+vehicleDictionaryFile: ${fileNames:NoRMS}${fileNames:vehicleDictionary}
+busEmissionFile: ${fileNames:NoRMS}${fileNames:busEmissions}

@@ -1,0 +1,9 @@
+﻿zone,tally,year,fuel,avg_mass,avg_cc,avg_co2,vehicle_type,cya,segment
+S02001261,1,2023,diesel,1500,1400,110,car,19,Unknown
+E02002052,1,2023,bev,1500,nan,100,car,19,large-suv-executive
+E02002052,1,2023,bev,nan,50,nan,car,19,large-suv-executive
+E02002627,1,2023,hydrogen,1000,2000,150,car,19,medium
+E02002623,1,2023,phev,1200,1000,220,car,19,large-suv-executive
+E02002623,1,2023,petrol,100,3000,200,lgv,19,n1 class i
+E02002623,1,2023,petrol,100,3000,200,lgv,19,Unknown
+E02002325,1,2023,diesel,1000,1400,140,car,19,large-suv-executive

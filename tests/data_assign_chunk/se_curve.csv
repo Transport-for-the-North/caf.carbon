@@ -1,0 +1,5 @@
+﻿segment,fuel,tailpipe_gco2,vehicle_type,speed_band,e_cohort
+medium,bev,30,car,a,2023
+medium,phev,40,car,b,2020
+n1 class i,bev,50,lgv,c,2020
+n1 class i,phev,60,lgv,d,2023

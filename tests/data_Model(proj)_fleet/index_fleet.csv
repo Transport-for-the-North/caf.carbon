@@ -1,0 +1,5 @@
+﻿zone,segment,vehicle_type,tally,cohort,fuel
+E02000001,medium,car,20,2023,bev
+E02000002,medium,car,10,2023,phev
+E02000003,n1 class i,lgv,10,2023,phev
+E02000004,n1 class i,lgv,10,2020,bev

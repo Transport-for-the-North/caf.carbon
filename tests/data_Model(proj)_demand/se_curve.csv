@@ -1,0 +1,6 @@
+﻿segment,fuel,gco2/km,vehicle_type,speed_band
+medium,bev,10,car,a
+medium,phev,20,car,b
+n1 class i,bev,30,lgv,c
+n1 class i,phev,40,lgv,d
+n1 class i,phev,40,lgv,d

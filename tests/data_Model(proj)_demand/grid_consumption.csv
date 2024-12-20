@@ -1,0 +1,5 @@
+﻿cohort,kwh_km,vehicle_type,segment,fuel
+2012,0.2,car,medium,bev
+2012,0.5,car,medium,phev
+2012,1,lgv,n1 class i,bev
+2012,1.2,lgv,n1 class i,phev
