@@ -1,0 +1,114 @@
+# GENERAL PARAMETERS #
+# What is the name of the overarching model run? This will appear in output file names.
+run_name: TfN_BAU_dev_run
+# Which STB regions is the model being run for? "Transport for the North", "Midlands Connect", "Transport East"...
+regions:
+  - Transport for the North
+# Which travel scenarios to run with? Business As Usual Core", "Accelerated EV Core
+# or Just About Managing, Prioritised Places, Digitally Distributed, Urban Zero Carbon
+scenarios:
+  - "Business As Usual Core"
+
+# Is the model framework being run for the first time? This will create mediating files like the base year fleet
+# which do not need to be run every time
+run_fresh: True
+# Is the model following a strategy trajectory? Default "none" will simply follow scenarios.
+pathway: "none"  # Options include "none", "decarb", "old"
+
+# PREPROCESSING PARAMETERS #
+run_preprocessing: False
+
+
+# FLEET MODEL PARAMETERS #
+# Is the Fleet Emissions model being run? This is the default mode to run CAFCarb in.
+run_fleet: True
+# What is the model base year? ONLY 2018 or 2023 can be selected.
+# Selecting 2018 will run an older version of CAFCarb
+fleet_year: 2023
+# What demand years are being used? These should be years with VKM data,
+# the fleet is always projected for every year until 2050.
+years_to_include:
+  - 2023
+  - 2025
+  - 2030
+  - 2035
+  - 2040
+  - 2045
+  - 2050
+
+# Should EVs appear universally, or based on local income? Default = False
+ev_redistribution: False
+# Is the EV redistribution being run for the first time? Default = same as run_fresh
+ev_redistribution_fresh: False
+
+# VKM MODEL PARAMETERS
+# Is the VKM Emissions model being run? This is a lower intensity/nuance carbon tool.
+run_vkm: False
+# The years to be run, should match available base and forecast years
+run_list:
+  - 2023
+  - 2028
+  - 2038
+  - 2043
+  - 2048
+# This should correspond to the input files pathway naming conventions.
+vkm_scenarios:
+  - BAU_ev_mandate
+
+# POSTPROCESSING PARAMETERS #
+
+# run the fleet emissions model
+
+
+# fleet model directory locations
+lookup_dir: D:\GitHub\caf.carbon\CAFCarb\lookup
+inputs_dir: D:\GitHub\caf.carbon\CAFCarb\input
+out_path: D:\GitHub\caf.carbon\CAFCarb\outputs
+fleet_dir: D:\GitHub\caf.carbon\CAFCarb\fleet
+
+# fleet model input data
+region_filter: D:\GitHub\caf.carbon\CAFCarb\lookup\stb_area_lookup.csv
+msoa_body: D:\GitHub\caf.carbon\CAFCarb\lookup\Bodytype by MSOA - 200507.csv
+msoa_lad: D:\GitHub\caf.carbon\CAFCarb\lookup\MSOA_LAD_lookup.csv
+msoa_area_type: D:\GitHub\caf.carbon\CAFCarb\lookup\areaTypesMSOA.csv
+target_area_type: D:\GitHub\caf.carbon\CAFCarb\lookup\New Area Types.csv
+anpr: D:\GitHub\caf.carbon\CAFCarb\lookup\ANPR_data_North.xlsx
+TRAVELLER_DATA: D:\GitHub\caf.carbon\CAFCarb\input\ev_weights\tfn_traveller_type.csv
+log_path: D:\GitHub\caf.carbon\CAFCarb\outputs\cafcarbon.log
+noham_to_msoa: D:\GitHub\caf.carbon\CAFCarb\lookup\noham_msoa_pop_weighted_lookup.csv
+DEMOGRAPHICS_DATA: D:\GitHub\caf.carbon\CAFCarb\input\ev_weights\output_2_DDG_gb_msoa_tfn_tt_2023_Central_pop.csv.bz2
+seg_share: D:\GitHub\caf.carbon\CAFCarb\input\2015_inputs\seg_prop_vtype_2015.csv
+fuel_share: D:\GitHub\caf.carbon\CAFCarb\input\2015_inputs\fuel_prop_segment_2015.csv
+demand_path: D:\GitHub\caf.carbon\CAFCarb\input\demand\TfN\detailed\
+NAEI_path: D:\GitHub\caf.carbon\CAFCarb\lookup\NAEI - Emissions factors.csv
+
+# fleet emissions tool preprocessing data
+DEMAND_FACTORS: D:\GitHub\caf.carbon\CAFCarb\lookup\demand_factors.csv
+MSOA_RTM_TRANSLATION: D:\GitHub\caf.carbon\CAFCarb\input\demand\TfSE\link_tables\SERTM_to_msoa11_spatial.csv
+LINK_ROAD_TYPES: D:\GitHub\caf.carbon\CAFCarb\input\demand\TfSE\link_tables\SE_link.csv
+DEMAND_DATA: O:\26.RTM2\SERTM2\Assignment
+LINK_DATA: O:\26.RTM2\SERTM2\Assignment
+DEMAND_OUT_PATH: D:\GitHub\caf.carbon\CAFCarb\input\demand\TfN\SC01
+
+# vkm preprocessing
+code_lookup :  D:\GitHub\caf.carbon\CAFCarb\lookup\North_MSOA_filter.csv
+vkm_input_folder :  A:/QCR- assignments/03.Assignments/h5files/outputs/VKMs-carbon_Northruns/BY_speed_banded_12-08-24/
+
+# vkm emissions tool data
+vkm_demand :  A:\caf.carbon\CAFCarb data inputs\
+vkm_out_path :  C:\Users\Renewed\Desktop\hold for assurance
+VKM_ZONE_CODE_LOOKUP :  A:\QCR- assignments\03.Assignments\h5files\Other Inputs\North_through_lookup-MSOA11_lta.csv
+grid_profiles: D:\GitHub\caf.carbon\CAFCarb\lookup\grid_emissions_profile.csv
+tail_pipe_profiles: D:\GitHub\caf.carbon\CAFCarb\lookup\emissions profile 2050 accounting.csv
+index_fleet_path: D:\GitHub\caf.carbon\CAFCarb\outputs\audit\index_fleet.csv
+
+# new dvla data
+vehicle_path: D:\GitHub\caf.carbon\CAFCarb\fleet\TFN Data Feb 24\TFNScan_Feb24.csv
+postcode_msoa: D:\GitHub\caf.carbon\CAFCarb\lookup\postcodes.csv
+dvla_body: D:\GitHub\caf.carbon\CAFCarb\lookup\DVLA_body_type_look_up.csv
+SEGMENT_CORRECTION: D:\GitHub\caf.carbon\CAFCarb\lookup\segment_distribution.csv
+
+# tables location
+general_table_path: D:\GitHub\caf.carbon\CAFCarb\input\general_tables.xlsx
+scenario_table_path: D:\GitHub\caf.carbon\CAFCarb\input\scenario_tables_DfT_CAS_EV_trajectory_only
+

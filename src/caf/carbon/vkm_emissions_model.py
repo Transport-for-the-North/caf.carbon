@@ -5,33 +5,31 @@ Created on Wed Sep 11 12:24:08 2024
 @author: Renewed
 """
 import pandas as pd
-from caf.carbon.load_data import (VKM_MODEL_DEMAND, VKM_DEMAND_OUT_PATH, GRID_EMISSIONS_PROFILES,
-                                  TAIL_PIPE_EMISSIONS_PROFILES, INDEX_FLEET)
 
 
 class VKMEmissionsModel:
     """Calculate fleet emissions from fleet and demand data."""
-    def __init__(self, run_list, run_fresh, regions, scenarios):
-        for scenario in scenarios:
+    def __init__(self, parameters):
+        for scenario in parameters.vkm_scenarios:
             self.scenario = scenario
             print(f"Running for Scenario {scenario}")
-            self.emission_profiles = CreateSimpleProfiles(run_fresh, self.scenario)
-            for year in run_list:
+            self.emission_profiles = CreateSimpleProfiles(parameters, self.scenario)
+            for year in parameters.run_list:
                 for time_period in ["TS1", "TS2", "TS3"]:
                     print(f"Running {time_period} {year}")
                     print("This may take some time...")
                     self.first_enumeration = True
                     keys_to_enumerate = pd.HDFStore(
-                        f"{VKM_MODEL_DEMAND}/{scenario}/{year}/vkm_by_speed_and_type_{year}_{time_period}_car.h5",
+                        f"{parameters.vkm_demand}/{scenario}/{year}/vkm_by_speed_and_type_{year}_{time_period}_car.h5",
                         mode="r").keys()
                     data_count = 0
                     for demand_key in keys_to_enumerate:
                         print(f"Processing demand for key {demand_key}", end='\r')
-                        demand_data = Demand(year, time_period, demand_key, self.scenario)
+                        demand_data = Demand(year, time_period, demand_key, self.scenario, parameters)
                         print(f"Allocating emissions for key {demand_key}", end='\r')
                         AllocateEmissions(demand_data.demand, year, time_period,
                                           data_count, self.scenario, self.emission_profiles.scenario_profile,
-                                          self.first_enumeration)
+                                          self.first_enumeration, parameters)
                         data_count = data_count + 1
                         if self.first_enumeration:
                             print("Enumeration changed")
@@ -41,9 +39,12 @@ class VKMEmissionsModel:
 class CreateSimpleProfiles:
     """Load in and preprocess scenario variant tables."""
 
-    def __init__(self, run_fresh, scenario):
-        self.run_fresh = run_fresh
+    def __init__(self, parameters, scenario):
+        self.run_fresh = parameters.run_fresh
         self.scenario = scenario
+        self.grid_emissions_profiles = parameters.grid_profiles
+        self.tail_pipe_emissions_profiles = parameters.tail_pipe_profiles
+        self.index_fleet = parameters.index_fleet_path
         if self.run_fresh:
             
             def linear_interpolation(df1, df2, df1year, df2year, target_year):
@@ -61,10 +62,10 @@ class CreateSimpleProfiles:
                 target = target[["speed_band", "year", "vehicle_type", "total_gco2"]]
                 return target
             
-            grid_emissions = pd.read_csv(GRID_EMISSIONS_PROFILES)
-            tailpipe_emissions = pd.read_csv(TAIL_PIPE_EMISSIONS_PROFILES)
-            scenario_vkm_splits = pd.read_csv(rf"{VKM_MODEL_DEMAND}\lookup\{self.scenario}_vkm_splits.csv")
-            fleet = pd.read_csv(INDEX_FLEET)
+            grid_emissions = pd.read_csv(self.grid_emissions_profiles)
+            tailpipe_emissions = pd.read_csv(self.tail_pipe_emissions_profiles)
+            scenario_vkm_splits = pd.read_csv(rf"{self.vkm_demand}\lookup\{self.scenario}_vkm_splits.csv")
+            fleet = pd.read_csv(self.index_fleet)
             fleet = fleet[["cohort", "vehicle_type", "segment", "tally"]].groupby(["cohort", "vehicle_type", "segment"],
                                                                                   as_index=False).sum()
             
@@ -102,11 +103,11 @@ class CreateSimpleProfiles:
                 petrol_emissions, how="left", on=["year", "vehicle_type", "speed_band"])
             scenario_emissions = scenario_emissions.fillna(0)
             scenario_emissions = scenario_emissions.merge(grid_emissions, how="left",  on=["year", "vehicle_type"])
-            scenario_emissions["total_gco2"] = scenario_emissions["petrol_gco2"] * scenario_emissions["petrol"]
-            scenario_emissions["total_gco2"] = scenario_emissions["total_gco2"] + (
-                    scenario_emissions["diesel_gco2"] * scenario_emissions["diesel"])
-            scenario_emissions["total_gco2"] = scenario_emissions["total_gco2"] + (
-                    scenario_emissions["grid_gco2"] * scenario_emissions["electric"])
+            # scenario_emissions["total_gco2"] = scenario_emissions["petrol_gco2"] * scenario_emissions["petrol"]
+            # scenario_emissions["total_gco2"] = scenario_emissions["total_gco2"] + (
+            #         scenario_emissions["diesel_gco2"] * scenario_emissions["diesel"])
+            scenario_emissions["total_gco2"] = 0
+            scenario_emissions["total_gco2"] = (scenario_emissions["grid_gco2"] * scenario_emissions["electric"])  # + scenario_emissions["total_gco2"]
             scenario_emissions = scenario_emissions[["speed_band", "year", "vehicle_type", "total_gco2"]]
 
             interpol_data_2019 = linear_interpolation(
@@ -144,7 +145,7 @@ class CreateSimpleProfiles:
                     scenario_emissions[scenario_emissions["year"] == 2050], 2045, 2050, year)
                 scenario_emissions = pd.concat([scenario_emissions, interpol_data])
             scenario_co2_reductions = pd.read_csv(
-                rf"{VKM_MODEL_DEMAND}\lookup\{self.scenario}_co2_management.csv")
+                rf"{parameters.vkm_demand}\lookup\{self.scenario}_co2_management.csv")
             scenario_co2_reductions["reduction"] = (1 - scenario_co2_reductions["reduction"])
             scenario_emissions = scenario_emissions.merge(scenario_co2_reductions, how="left",
                                                           on=["year", "vehicle_type"])
@@ -153,31 +154,32 @@ class CreateSimpleProfiles:
 
             self.scenario_profile = scenario_emissions
             self.scenario_profile.to_csv(
-                rf"{VKM_MODEL_DEMAND}\
+                rf"{parameters.vkm_demand}\
                 input\{self.scenario}_emissions_profiles.csv", index=False)
         else:
             self.scenario_profile = pd.read_csv(
-                rf"{VKM_MODEL_DEMAND}\input\{self.scenario}_emissions_profiles.csv")
+                rf"{parameters.vkm_demand}\input\{self.scenario}_emissions_profiles.csv")
             
 
 class AllocateEmissions:
     """Load in and preprocess scenario variant tables."""
 
-    def __init__(self, demand, year, time_period, key, scenario, scenario_profile, first_enumeration):
+    def __init__(self, demand, year, time_period, key, scenario, scenario_profile, first_enumeration, parameters):
         self.year = year
         self.scenario = scenario
+        self.vkm_demand = parameters.vkm_demand
         self.scenario_profile = scenario_profile
         self.first_enumeration = first_enumeration
         self.time_period = time_period
         self.key = f"{self.time_period}_{self.year}_{key}"
-        self.out_path = VKM_DEMAND_OUT_PATH
+        self.out_path = parameters.vkm_out_path
         self.demand = demand
         self.__assign_emissions()
 
     def __assign_emissions(self):
         print("Creating emissions", end='\r')
         scenario_vkm_reductions = pd.read_csv(
-            rf"{VKM_MODEL_DEMAND}\lookup\{self.scenario}_vkm_management.csv")
+            rf"{self.vkm_demand}\lookup\{self.scenario}_vkm_management.csv")
         scenario_vkm_reductions["reduction"] = (1 - scenario_vkm_reductions["reduction"])
 
         scenario_emissions_data = self.demand.merge(scenario_vkm_reductions, how="left", on=["year", "vehicle_type"])
@@ -187,9 +189,9 @@ class AllocateEmissions:
                                                                 how="left", on=["speed_band", "year", "vehicle_type"])
         scenario_emissions_data["total_gco2"] = scenario_emissions_data["total_gco2"] * scenario_emissions_data["vkm"]
         scenario_emissions_data = scenario_emissions_data[[
-            "destination", "through", "origin", "user_class", "trip_band", "vehicle_type", "vkm", "total_gco2"]]
+            "destination", "through", "origin", "user_class", "vehicle_type", "vkm", "total_gco2"]]  # "trip_band"
         scenario_emissions_data = scenario_emissions_data.groupby([
-            "destination", "through", "origin", "vehicle_type", "trip_band", "user_class"], as_index=False).sum()
+            "destination", "through", "origin", "vehicle_type", "user_class"], as_index=False).sum()  # "trip_band"
 
         print("Writing out", end='\r')
         if self.first_enumeration:
@@ -211,8 +213,9 @@ class AllocateEmissions:
 class Demand:
     """Load in and preprocess scenario variant tables."""
 
-    def __init__(self, demand_year, time_period, demand_key, scenario):
+    def __init__(self, demand_year, time_period, demand_key, scenario, parameters):
         self.year = demand_year
+        self.vkm_demand = parameters.vkm_demand
         self.scenario = scenario
         self.key = demand_key
         self.time_period = time_period
@@ -226,14 +229,14 @@ class Demand:
 
     def __load_car_demand(self):
         """Load the car demand for a specified scenario."""
-        demand = pd.read_hdf(f"{VKM_MODEL_DEMAND}/{self.scenario}/{self.year}/"
+        demand = pd.read_hdf(f"{self.vkm_demand}/{self.scenario}/{self.year}/"
                              f"vkm_by_speed_and_type_{self.year}_{self.time_period}_car.h5",
                              self.key, mode="r")
         return demand
 
     def __load_hgv_demand(self):
         """Load the hgv demand for a specified scenario."""
-        hgv_demand = pd.read_hdf(f"{VKM_MODEL_DEMAND}/{self.scenario}/{self.year}/"
+        hgv_demand = pd.read_hdf(f"{self.vkm_demand}/{self.scenario}/{self.year}/"
                                  f"vkm_by_speed_and_type_{self.year}_{self.time_period}_hgv.h5", self.key, mode="r")
         hgv_demand["vkm_70-90_kph"] = hgv_demand["vkm_90-110_kph"] + hgv_demand["vkm_70-90_kph"]
         hgv_demand["vkm_90-110_kph"] = 0
@@ -241,7 +244,7 @@ class Demand:
 
     def __load_lgv_demand(self):
         """Load the lgv demand for a specified scenario."""
-        lgv_demand = pd.read_hdf(f"{VKM_MODEL_DEMAND}/{self.scenario}/{self.year}/"
+        lgv_demand = pd.read_hdf(f"{self.vkm_demand}/{self.scenario}/{self.year}/"
                                  f"vkm_by_speed_and_type_{self.year}_{self.time_period}_lgv.h5", self.key, mode="r")
         return lgv_demand
 
@@ -257,7 +260,7 @@ class Demand:
             "50_70",
             "70_90",
             "90_110",
-            "trip_band",
+            # "trip_band",
         ]
         original_cols = [
             "origin",
@@ -269,7 +272,7 @@ class Demand:
             "vkm_50-70_kph",
             "vkm_70-90_kph",
             "vkm_90-110_kph",
-            "trip_band",
+            # "trip_band",
         ]
         if vehicle_type == "car":
             demand = self.__load_car_demand()
@@ -293,7 +296,7 @@ class Demand:
                 "50_70",
                 "70_90",
                 "90_110",
-                "trip_band",
+                # "trip_band",
             ]
         ]
         demand = pd.melt(
@@ -304,7 +307,7 @@ class Demand:
                 "through",
                 "vehicle_type",
                 "user_class",
-                "trip_band",
+                # "trip_band",
             ],
             var_name="speed_band",
             value_name="vkm",

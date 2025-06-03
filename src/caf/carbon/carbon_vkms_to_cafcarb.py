@@ -6,20 +6,18 @@ Created on Wed Jul 24 14:42:35 2024
 """
 
 import pandas as pd
-from caf.carbon.load_data import (VKM_MODEL_DEMAND, VKM_INPUT_FOLDER, CODE_LOOKUP)
 
 
 class VKMPreprocessing:
 
-    def __init__(self, year):
+    def __init__(self, year, parameters):
         """Initialise functions and set class variables."""
-
         self.year = year
         self.trip_bands = [2, 5, 10, 20, 50]
         self.code_lookup = self.code_lookup[["zone_cd", "zone"]]
-        self.__generate_inputs()
+        self.__generate_inputs(parameters)
 
-    def __generate_inputs(self):
+    def __generate_inputs(self, parameters):
 
         def apply_trip_bands(dataframe):
             S = len(self.trip_bands) - 1
@@ -52,14 +50,14 @@ class VKMPreprocessing:
             car_chunk = pd.DataFrame()
 
             for userclass in ["uc1", "uc2", "uc3"]:
-                car_slice = pd.read_csv(VKM_INPUT_FOLDER + f"{self.year}/NoHAM_QCR_DM_Core_2043_{time_period}_v107_SatPig_{userclass}_aggregated-routes_through.csv")
+                car_slice = pd.read_csv(parameters.vkm_input_folder + f"{self.year}/NoHAM_QCR_DM_Core_2043_{time_period}_v107_SatPig_{userclass}_aggregated-routes_through.csv")
                 car_slice["user_class"] = userclass
                 car_chunk = pd.concat([car_chunk, car_slice])
 
-            lgv_chunk = pd.read_csv(VKM_INPUT_FOLDER + f"{self.year}/NoHAM_QCR_DM_Core_2043_{time_period}_v107_SatPig_uc4_aggregated-routes_through.csv")
+            lgv_chunk = pd.read_csv(parameters.vkm_input_folder + f"{self.year}/NoHAM_QCR_DM_Core_2043_{time_period}_v107_SatPig_uc4_aggregated-routes_through.csv")
             lgv_chunk["user_class"] = "uc4"
 
-            hgv_chunk = pd.read_csv(VKM_INPUT_FOLDER + f"{self.year}/NoHAM_QCR_DM_Core_2043_{time_period}_v107_SatPig_uc5_aggregated-routes_through.csv")
+            hgv_chunk = pd.read_csv(parameters.vkm_input_folder + f"{self.year}/NoHAM_QCR_DM_Core_2043_{time_period}_v107_SatPig_uc5_aggregated-routes_through.csv")
             hgv_chunk["user_class"] = "uc5"
 
             car_chunk = rename_speed_bands(car_chunk)
@@ -105,11 +103,11 @@ class VKMPreprocessing:
             lgv = lgv.groupby(["origin", "destination", "through", "trip_band", "user_class"], as_index=False).sum()
             hgv = hgv.groupby(["origin", "destination", "through", "trip_band", "user_class"], as_index=False).sum()
 
-            car = car.merge(CODE_LOOKUP, how="left", left_on="origin", right_on="zone")
+            car = car.merge(parameters.code_lookup, how="left", left_on="origin", right_on="zone")
             car = car.drop(columns=["origin", "zone"])
-            lgv = lgv.merge(CODE_LOOKUP, how="left", left_on="origin", right_on="zone")
+            lgv = lgv.merge(parameters.code_lookup, how="left", left_on="origin", right_on="zone")
             lgv = lgv.drop(columns=["origin", "zone"])
-            hgv = hgv.merge(CODE_LOOKUP, how="left", left_on="origin", right_on="zone")
+            hgv = hgv.merge(parameters.code_lookup, how="left", left_on="origin", right_on="zone")
             hgv = hgv.drop(columns=["origin", "zone"])
 
             car = car.rename(columns={"zone_cd": "origin"})
@@ -136,37 +134,37 @@ class VKMPreprocessing:
 
                 if component_no == 0:
                     car_component.to_hdf(
-                        VKM_MODEL_DEMAND + f"vkm_by_speed_and_type_{self.year}_{time_period}_car.h5",
+                        parameters.vkm_demand + f"vkm_by_speed_and_type_{self.year}_{time_period}_car.h5",
                         f"{component_no}", mode='w', complevel=1, format="table",
                         index=False,
                     )
                 else:
                     car_component.to_hdf(
-                        VKM_MODEL_DEMAND + f"vkm_by_speed_and_type_{self.year}_{time_period}_car.h5",
+                        parameters.vkm_demand + f"vkm_by_speed_and_type_{self.year}_{time_period}_car.h5",
                         f"{component_no}", mode='a', complevel=1, append=True, format="table",
                         index=False,
                     )
                 if component_no == 0:
                     lgv_component.to_hdf(
-                        VKM_MODEL_DEMAND + f"vkm_by_speed_and_type_{self.year}_{time_period}_lgv.h5",
+                        parameters.vkm_demand + f"vkm_by_speed_and_type_{self.year}_{time_period}_lgv.h5",
                         f"{component_no}", mode='w', complevel=1, format="table",
                         index=False,
                     )
                 else:
                     lgv_component.to_hdf(
-                        VKM_MODEL_DEMAND + f"vkm_by_speed_and_type_{self.year}_{time_period}_lgv.h5",
+                        parameters.vkm_demand + f"vkm_by_speed_and_type_{self.year}_{time_period}_lgv.h5",
                         f"{component_no}", mode='a', complevel=1, append=True, format="table",
                         index=False,
                     )
                 if component_no == 0:
                     hgv_component.to_hdf(
-                        VKM_MODEL_DEMAND + f"vkm_by_speed_and_type_{self.year}_{time_period}_hgv.h5",
+                        parameters.vkm_demand + f"vkm_by_speed_and_type_{self.year}_{time_period}_hgv.h5",
                         f"{component_no}", mode='w', complevel=1, format="table",
                         index=False,
                     )
                 else:
                     hgv_component.to_hdf(
-                        VKM_MODEL_DEMAND + f"vkm_by_speed_and_type_{self.year}_{time_period}_hgv.h5",
+                        parameters.vkm_demand + f"vkm_by_speed_and_type_{self.year}_{time_period}_hgv.h5",
                         f"{component_no}", mode='a', complevel=1, append=True, format="table",
                         index=False,
                     )

@@ -9,7 +9,6 @@ import math
 
 # Local Imports
 from caf.carbon import audit_tests as at
-from caf.carbon.load_data import GENERAL_TABLES_PATH, SCENARIO_TABLES_PATH, NAEI_PATH
 
 
 # %% Helper functions
@@ -49,7 +48,7 @@ def group_to_list_string(start, end):
     return ",".join(map(str, cya_list))
 
 
-def new_load_general_table(sheet_name: str) -> pd.DataFrame:
+def new_load_general_table(sheet_name: str, parameters) -> pd.DataFrame:
     """Load tables from Excel sheets. Remove the config.txt method and access the sheets into a df directly"""
     if sheet_name in ["gridConsumption", "gridCarbonIntensity"]:
         header_row = 2
@@ -57,7 +56,7 @@ def new_load_general_table(sheet_name: str) -> pd.DataFrame:
         header_row = 0
 
     table = pd.read_excel(
-        io=GENERAL_TABLES_PATH, sheet_name=sheet_name, header=header_row
+        io=parameters.general_table_path, sheet_name=sheet_name, header=header_row
     ).dropna()
 
     # pylint: enable-all
@@ -67,7 +66,7 @@ def new_load_general_table(sheet_name: str) -> pd.DataFrame:
     return table
 
 
-def new_load_scenario_tables(scenario: str, table_name: str, suffix) -> pd.DataFrame:
+def new_load_scenario_tables(scenario: str, table_name: str, parameters, suffix) -> pd.DataFrame:
     """Load scenario tables from inputs folder"""
     # TODO(JC): - update in future
     table_ranges = {
@@ -86,7 +85,7 @@ def new_load_scenario_tables(scenario: str, table_name: str, suffix) -> pd.DataF
     use_cols = table_ranges[table_name]
 
     table = pd.read_excel(
-        io='{}{}'.format(SCENARIO_TABLES_PATH, suffix),
+        io='{}{}'.format(parameters.scenario_table_path, suffix),
         sheet_name=scenario,
         usecols=use_cols,
         header=1
@@ -98,7 +97,7 @@ def new_load_scenario_tables(scenario: str, table_name: str, suffix) -> pd.DataF
     return table
 
 
-def load_scenario_tables(scenario: str, table_name: str, suffix) -> pd.DataFrame:
+def load_scenario_tables(scenario: str, table_name: str, parameters, suffix) -> pd.DataFrame:
     """Load scenario tables from inputs folder"""
     # TODO(JC): - update in future
     table_ranges = {
@@ -117,7 +116,7 @@ def load_scenario_tables(scenario: str, table_name: str, suffix) -> pd.DataFrame
     use_cols = table_ranges[table_name]
 
     table = pd.read_excel(
-        io='{}{}'.format(SCENARIO_TABLES_PATH, suffix),
+        io='{}{}'.format(parameters.scenario_table_path, suffix),
         sheet_name=scenario,
         usecols=use_cols,
         header=1
@@ -129,12 +128,12 @@ def load_scenario_tables(scenario: str, table_name: str, suffix) -> pd.DataFrame
     return table
 
 
-def load_csv(self, table_name):
+def load_csv(self, table_name, parameters):
     """Load table from a csv with only one table.
 
     Path is loaded from the config.txt settings.
     """
-    file_path = NAEI_PATH
+    file_path = parameters.naei
     table = pd.read_csv(file_path)
     table = camel_columns_to_snake(table)
     at.describe_table(table_name, table, file_path)
@@ -383,7 +382,7 @@ def s_curve_value(a, k, x0, x):
     return value
 
 
-def load_table(self, table_name, table_type=None, suffix="File"):
+def load_table(self, table_name,  parameters, table_type=None, suffix="File"):
     """Load table from an excel sheet containing multiple tables.
 
     Path, sheet and position are loaded from the config.txt settings.
@@ -395,14 +394,14 @@ def load_table(self, table_name, table_type=None, suffix="File"):
         header_row = 2
     if suffix in ["None", ""]:
         suffix = "File"
-    file_path = GENERAL_TABLES_PATH
+    file_path = parameters.general_table_path
     if table_name in ["gridConsumption", "gridCarbonIntensity"]:
         header_row = 2
     else:
         header_row = 0
 
     table = pd.read_excel(
-        io=GENERAL_TABLES_PATH, sheet_name=table_name, header=header_row
+        io=parameters.general_table_path, sheet_name=table_name, header=header_row
     ).dropna()
 
     # Remove column suffixes (eg. second 2018 column is called 2018.2)

@@ -5,7 +5,6 @@ import numpy as np
 
 from caf.carbon import utility as ut
 from caf.carbon import fleet_redistribution
-from caf.carbon.load_data import OUT_PATH
 
 
 class Model:
@@ -13,8 +12,7 @@ class Model:
 
     def __init__(
         self, region_filter, invariant_obj,
-            scenario_obj, ev_redistribution, run_name,
-            ev_redistribution_fresh, years_to_include
+            scenario_obj, parameters
     ):
         """Initialise functions and set class variables.
 
@@ -25,15 +23,15 @@ class Model:
         scenario_obj : class obj
             Includes scenario tables.
         """
-        self.outpath = OUT_PATH
-        self.run_name = run_name
+        self.outpath = parameters.out_path
+        self.run_name = parameters.run_name
         self.invariant = invariant_obj
         self.scenario = scenario_obj
         self.se_curve = self.invariant.se_curve
         self.date = datetime.today().strftime("%Y_%m_%d")
-        self.years_to_include = years_to_include
-        self.ev_redistribution = ev_redistribution
-        self.ev_redistribution_fresh = ev_redistribution_fresh
+        self.years_to_include = parameters.years_to_include
+        self.ev_redistribution = parameters.ev_redistribution
+        self.ev_redistribution_fresh = parameters.ev_redistribution_fresh
         self.region_filter = region_filter
         self.__predict_fleet_size()
         self.__create_future_fleet()
@@ -240,8 +238,9 @@ class Model:
                                      * se_curve["ghg_factor"]
                                      * (1 + se_curve["co2_reduction"])
                                      * se_curve["index_carbon_reduction"])
-        # se_curve = se_curve.set_index(["fuel", "segment", "e_cohort", "speed_band", "vehicle_type"])
         self.se_curve = se_curve[["fuel", "segment", "e_cohort", "speed_band", "vehicle_type", "tailpipe_gco2"]]
+        # TODO: Remove cohort from speed emissions curve
+        self.se_curve.to_csv("se_curve.csv")
         grid_consumption = self.invariant.grid_consumption
         grid_intensity = self.invariant.grid_intensity
         grid_consumption["join"], grid_intensity["join"] = 1, 1
@@ -253,18 +252,6 @@ class Model:
     def allocate_emissions(self, demand_data, year, time_period, first_enumeration):
         """Distribute the vehicle kms between fuel-segment-cohorts."""
 
-        # introduce vkm chunking, break apart fleet, loop over last three functions, concat on outputs only
-        # Divide chainage by ANPR data, each cya is distributed part of the bodytype-roadtype chainage
-        # loop on ts and uc
-        # print("grouping demand")
-        # chainage = (
-        #     chainage.groupby(["vehicle_type", "cya", "user_class", "origin", "destination",
-        #                       "through", "speed_band", "trip_band"])["vkm"]
-        #     .sum()
-        #     .reset_index()
-        # )
-        # component_no, component_size = 0, 20
-        # unique_origins = self.unique_origins
         for user_class in [["uc1"], ["uc2"], ["uc3"], ["uc4"], ["uc5"]]:
             print(user_class, end='\r')
             fleet_component = self.projected_fleet[self.projected_fleet["year"] == year]
@@ -276,8 +263,6 @@ class Model:
                 fleet_component, demand_component)
             """Save the final output (fleet + chainage + emissions)."""
             emissions_data["scenario"] = self.scenario.scenario_code
-            # fleet = fleet.merge( TODO may need to add this later for WSP
-            #     self.invariant.new_area_types[["zone", "msoa_area_type"]], how="left", on="zone", copy=False)
             print("writing to file", end='\r')
             if first_enumeration:
                 emissions_data.to_hdf(
@@ -297,6 +282,7 @@ class Model:
                 print("Appending", end='\r')
 
     def assign_chunk_emissions(self, fleet, demand):
+        # TODO: remove cya from the fleet
         fleet = fleet.set_index(["vehicle_type", "cya", "origin"])
         demand = pd.merge(
             self.invariant.anpr,
@@ -305,7 +291,7 @@ class Model:
             on="vehicle_type",  # ["vehicle_type", "road_type"]
             copy=False
         )
-        demand["vkm"] *= demand["cya_prop_of_bt_rt"]
+        demand["vkm"] *= demand["cya_prop_of_bt_rt"]  # distributes demand over cya, can remove
         demand = demand.drop(columns=["cya_prop_of_bt_rt"])
         demand = demand.set_index(["vehicle_type", "cya", "origin"])
         print("merging fleet with demand", end='\r')
@@ -321,12 +307,12 @@ class Model:
             columns=["prop_by_fuel_seg_cohort"]
         )  # 7 seconds
         # All cohorts after the index year use the index year se curves with a scaling factor
-        fleet["e_cohort"] = np.minimum(fleet["cohort"], self.invariant.index_year)
+        fleet["e_cohort"] = np.minimum(fleet["cohort"], self.invariant.index_year)  # cohort now irrelevant?
         print("merge se curve with fleet", end='\r')
         fleet = fleet.merge(
             self.se_curve,
             how="left",
-            on=["fuel", "segment", "e_cohort", "speed_band", "vehicle_type"],
+            on=["fuel", "segment", "e_cohort", "speed_band", "vehicle_type"],  # note cohort presence
             copy=False
         )  # TODO 50 seconds
         # CO2 = CO2/km * km

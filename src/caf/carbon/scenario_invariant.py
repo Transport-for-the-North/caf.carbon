@@ -4,16 +4,6 @@ from sklearn.experimental import enable_iterative_imputer
 import pandas as pd
 import numpy as np
 from caf.carbon import utility as ut
-from caf.carbon.load_data import (
-    OUT_PATH,
-    VEHICLE_PATH,
-    POSTCODE_MSOA,
-    DVLA_BODY,
-    MSOA_AREA_TYPE,
-    TARGET_AREA_TYPE,
-    ANPR_DATA,
-)
-
 
 # %% Helper Classes
 class Imputation:
@@ -282,8 +272,7 @@ class CurveFitting:
 class IndexFleet:
     """Load in and preprocess DfT Fleet data."""
 
-    def __init__(self, run_fresh, fleet_year, out_path=None):
-    #def __init__(self, run_fresh, fleet_year):
+    def __init__(self, parameters):
         """Initialise functions and set filepath to export tables.
 
         Parameters
@@ -293,13 +282,13 @@ class IndexFleet:
             or whether preprocessed tables are called in, thereby skipping
             preprocessing.
         """
-        if out_path is None:
-            self.outpath = OUT_PATH
-        else:
-            self.outpath = out_path
+        self.outpath = parameters.out_path
+        self.vehicle_path = parameters.vehicle_path
+        self.postcode_msoa = parameters.postcode_msoa
+        self.dvla_body = parameters.dvla_body
 
-        if run_fresh:
-            self.fleet_index_year = fleet_year
+        if parameters.run_fresh:
+            self.fleet_index_year = parameters.fleet_year
             self.__load_fleet()
             self.__basic_clean()
             self.__advanced_clean()
@@ -312,7 +301,7 @@ class IndexFleet:
 
     def __load_fleet(self):
         """Read in the DfT fleet data for cars, vans and HGVs and concatenate."""
-        fleet_archive = pd.read_csv(VEHICLE_PATH)  # TODO replace with separate functionality of loading data
+        fleet_archive = pd.read_csv(self.vehicle_path)  # TODO replace with separate functionality of loading data
         fleet_archive = fleet_archive.rename(
             columns={
                 "Post_Code_Current": "Postcode",
@@ -325,7 +314,7 @@ class IndexFleet:
         )
 
         postcode_to_msoa = pd.read_csv(
-            POSTCODE_MSOA, usecols=["Postcode", "MSOA Code"]
+            self.postcode_msoa, usecols=["Postcode", "MSOA Code"]
         ).rename(columns={"MSOA Code": "Zone"})
         postcode_to_msoa["Postcode"] = postcode_to_msoa["Postcode"].str.replace(" ", "")
         fleet_archive = fleet_archive.merge(postcode_to_msoa, on="Postcode", how="left")
@@ -362,7 +351,7 @@ class IndexFleet:
         fleet_archive["fuel"] = fleet_archive["fuel"].str.lower().fillna("diesel")
         fleet_archive = fleet_archive[
             fleet_archive["fuel"].isin(["diesel", "petrol", "phev", "bev", "hybrid", "hydrogen", "petrol hybrid"])]
-        fleet_segmentation = pd.read_csv(DVLA_BODY)
+        fleet_segmentation = pd.read_csv(self.dvla_body)
         fleet_archive = fleet_archive.merge(fleet_segmentation, how="left", on=["body_type_text", "wheelplan_text"])
         fleet_archive = fleet_archive.drop(columns=["wheelplan_text", "body_type_text"])
         fleet_archive = fleet_archive[~fleet_archive["zone"].isin(["zzDisposal", "zzUnknown"])]
@@ -531,7 +520,7 @@ class IndexFleet:
 class Invariant:
     """Import and preprocess scenario invariant tables (baseline inputs)."""
 
-    def __init__(self, index_fleet_obj, fleet_year):
+    def __init__(self, index_fleet_obj, parameters):
         """Initialise functions and set class parameters.
 
         Parameters
@@ -541,13 +530,16 @@ class Invariant:
             preprocessed historic fleet and emission characteristics.
         """
         self.index_fleet = index_fleet_obj
-        self.index_year = fleet_year
+        self.index_year = parameters.fleet_year
+        self.msoa_area_type = parameters.msoa_area_type
+        self.target_area_type = parameters.target_area_type
+        self.anpr = parameters.anpr
         self.save_invariant = True
         self.type = "general"
         self.scenario_name = "general"
         # Choose a scenario for grid carbon intensity
         self.grid_intensity_scenario = "CCC Balanced"  # Options include CCC Balanced or TAG
-        self.__import_shared_tables()
+        self.__import_shared_tables(parameters)
         self.__warp_tables()
         self.__generate_curves()
         self.__load_anpr()
@@ -580,23 +572,23 @@ class Invariant:
             f"{self.index_fleet.outpath}/audit/scrappage_curve.csv", index=False
         )
 
-    def __import_shared_tables(self):
+    def __import_shared_tables(self, parameters):
         """Import scenario invariant/baseline inputs."""
-        self.real_world_coefficients = ut.new_load_general_table("realWorldAttributes")
-        self.fuel_characteristics = ut.new_load_general_table("fuelCharacteristics")
-        self.yearly_co2_reduction = ut.new_load_general_table("newVehicleCarbonReduction")
-        self.biofuel_reduction = ut.new_load_general_table("fuelComposition")
-        self.ghg_equivalent = ut.new_load_general_table("GHGEquivalent")
-        self.pt_ghg_factor = ut.new_load_general_table("PTGHGEquivalent")
-        self.naei_coefficients = ut.new_load_general_table("naei")
-        self.grid_consumption = ut.new_load_general_table("gridConsumption")
-        self.grid_intensity = ut.new_load_general_table("gridCarbonIntensity")
+        self.real_world_coefficients = ut.new_load_general_table("realWorldAttributes", parameters)
+        self.fuel_characteristics = ut.new_load_general_table("fuelCharacteristics", parameters)
+        self.yearly_co2_reduction = ut.new_load_general_table("newVehicleCarbonReduction", parameters)
+        self.biofuel_reduction = ut.new_load_general_table("fuelComposition", parameters)
+        self.ghg_equivalent = ut.new_load_general_table("GHGEquivalent", parameters)
+        self.pt_ghg_factor = ut.new_load_general_table("PTGHGEquivalent", parameters)
+        self.naei_coefficients = ut.new_load_general_table("naei", parameters)
+        self.grid_consumption = ut.new_load_general_table("gridConsumption", parameters)
+        self.grid_intensity = ut.new_load_general_table("gridCarbonIntensity", parameters)
 
-        self.msoa_area_info = pd.read_csv(MSOA_AREA_TYPE)
+        self.msoa_area_info = pd.read_csv(self.msoa_area_type)
         self.msoa_area_info = self.msoa_area_info.rename(
             columns={"msoaZoneID": "zone", "R": "msoa_area_type"}
         )
-        self.new_area_types = pd.read_csv(TARGET_AREA_TYPE)
+        self.new_area_types = pd.read_csv(self.target_area_type)
         self.new_area_types = self.new_area_types.rename(
             columns={"msoa_area_code": "zone", "tfn_area_type": "msoa_area_type"}
         )
@@ -697,7 +689,7 @@ class Invariant:
         for i in ["Car", "Van", "HGV"]:
             sheet = i + " output"
             # Import relevant tab
-            anpr_info = pd.read_excel(ANPR_DATA, sheet_name=sheet)
+            anpr_info = pd.read_excel(self.anpr, sheet_name=sheet)
             anpr_info = ut.camel_columns_to_snake(anpr_info)
 
             # Make ANPR df consistent with fleet data

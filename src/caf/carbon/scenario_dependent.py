@@ -1,12 +1,11 @@
 import pandas as pd
 from caf.carbon import utility as ut
 import configparser as cf
-from caf.carbon.load_data import SEG_SHARE, FUEL_SHARE, DEMAND_PATH
 
 
 class Scenario:
     """Load in and preprocess scenario variant tables."""
-    def __init__(self, scenario_name, invariant_obj, pathway="none"):
+    def __init__(self, scenario_name, invariant_obj, parameters):
         """Initialise functions and set class variables.
         Parameters
         ----------
@@ -14,16 +13,16 @@ class Scenario:
             Full name of scenario.
         invariant_obj : class obj
             Includes the baseline fleet and scenario invariant tables.
-        pathway : str
-            Determines whether 'pathway' or standard scenario inputs are called in.
         """
         self.configuration = cf.ConfigParser(interpolation=cf.ExtendedInterpolation())
         self.type = "scenario"
+        self.seg_share = parameters.seg_share
+        self.fuel_share = parameters.fuel_share
         self.scenario_name = scenario_name
         self.invariant = invariant_obj
         self.index_year = invariant_obj.index_year
         self.__load_keys()
-        self.__load_scenario(pathway)
+        self.__load_scenario(parameters)
         self.__warp_tables()
 
     def __load_keys(self):
@@ -45,56 +44,59 @@ class Scenario:
                               "BAU": "SC05",
                               "AE": "SC06"}[self.scenario_initials]
 
-    def __load_scenario(self, pathway="none"):
+    def __load_scenario(self, parameters):
+        pathway = parameters.pathway
         """Load in scenario tables."""
         if self.index_year == 2018:
             self.seg_share_of_year_type_sales = ut.load_scenario_tables(
-                self.scenario_name, "segSales_propOfTypeYear", suffix=pathway
+                self.scenario_name, "segSales_propOfTypeYear", parameters, suffix=pathway
             )
             self.fuel_share_of_year_seg_sales = ut.load_scenario_tables(
-                self.scenario_name, "fuelSales_propOfSegYear", suffix=pathway
+                self.scenario_name, "fuelSales_propOfSegYear", parameters, suffix=pathway
             )
             self.type_fleet_size_growth = ut.load_scenario_tables(
-                self.scenario_name, "fleetSize_totOfYear", suffix=pathway
+                self.scenario_name, "fleetSize_totOfYear", parameters, suffix=pathway
             )
-            self.co2_reductions = ut.load_scenario_tables(self.scenario_name, "co2Reduction", suffix=pathway
-                                                              )
+            self.co2_reductions = ut.load_scenario_tables(
+                self.scenario_name, "co2Reduction", parameters, suffix=pathway
+            )
             self.km_index_reductions = ut.load_scenario_tables(
-                self.scenario_name, "ChainageReduction", suffix=pathway
+                self.scenario_name, "ChainageReduction", parameters, suffix=pathway
             )
             self.co2_reductions = ut.load_scenario_tables(self.scenario_name, "co2Reduction", suffix=pathway)
             self.km_index_reductions = ut.load_scenario_tables(
-                self.scenario_name, "ChainageReduction", suffix=pathway
+                self.scenario_name, "ChainageReduction", parameters, suffix=pathway
             )
         else:
             self.seg_share_of_year_type_sales = ut.new_load_scenario_tables(
-                self.scenario_name, "segSales_propOfTypeYear", suffix=pathway
+                self.scenario_name, "segSales_propOfTypeYear", parameters, suffix=pathway
             )
             self.fuel_share_of_year_seg_sales = ut.new_load_scenario_tables(
-                self.scenario_name, "fuelSales_propOfSegYear", suffix=pathway
+                self.scenario_name, "fuelSales_propOfSegYear", parameters, suffix=pathway
             )
             self.type_fleet_size_growth = ut.new_load_scenario_tables(
-                self.scenario_name, "fleetSize_totOfYear", suffix=pathway
+                self.scenario_name, "fleetSize_totOfYear", parameters, suffix=pathway
             )
-            self.co2_reductions = ut.new_load_scenario_tables(self.scenario_name, "co2Reduction", suffix=pathway
+            self.co2_reductions = ut.new_load_scenario_tables(
+                self.scenario_name, "co2Reduction", parameters, suffix=pathway
                                                               )
             self.km_index_reductions = ut.new_load_scenario_tables(
-                self.scenario_name, "ChainageReduction", suffix=pathway
+                self.scenario_name, "ChainageReduction", parameters, suffix=pathway
             )
             self.co2_reductions = ut.new_load_scenario_tables(self.scenario_name, "co2Reduction", suffix=pathway)
             self.km_index_reductions = ut.new_load_scenario_tables(
-                self.scenario_name, "ChainageReduction", suffix=pathway
+                self.scenario_name, "ChainageReduction", parameters, suffix=pathway
             )
         # File paths are different if the index year is 2015
         # Carry out some preprocessing so the tables are consistent with 2018 inputs
         if self.index_year == 2015:  # !
-            seg_share_2015 = pd.read_csv(SEG_SHARE)
+            seg_share_2015 = pd.read_csv(self.seg_share)
             print(self.fuel_share_of_year_seg_sales)
             seg_share_2015.columns = ["segment", 2015]
             self.seg_share_of_year_type_sales = self.seg_share_of_year_type_sales.merge(
                 seg_share_2015, on="segment", how="left"
             )
-            fuel_share_2015 = pd.read_csv(FUEL_SHARE)
+            fuel_share_2015 = pd.read_csv(self.fuel_share)
             fuel_share_2015.columns = ["segment", "fuel", 2015]
             self.fuel_share_of_year_seg_sales = self.fuel_share_of_year_seg_sales.merge(
                 fuel_share_2015, on=["segment", "fuel"], how="left"
@@ -159,7 +161,7 @@ class Scenario:
 class Demand:
     """Load in and preprocess scenario variant tables."""
 
-    def __init__(self, scenario_obj, demand_year, time_period, demand_key):
+    def __init__(self, scenario_obj, parameters, demand_year, time_period, demand_key):
         """Initialise functions and set class variables.
 
         Parameters
@@ -173,6 +175,7 @@ class Demand:
         """
 
         self.invariant = scenario_obj
+        self.demand_path = parameters.demand_path
         self.year = demand_year
         self.key = demand_key
         self.time_period = time_period
@@ -191,7 +194,7 @@ class Demand:
 
     def __load_car_demand(self):
         """Load the car demand for a specified scenario."""
-        path = str(DEMAND_PATH) + f"/{self.scenario_code}/"
+        path = str(self.demand_path) + f"/{self.scenario_code}/"
         # self.configuration["filePaths"]["DemandFile"]
         # Iterate through all model years loading and appending demand.
         demand = pd.read_hdf(f"{path}vkm_by_speed_and_type_{self.year}_{self.time_period}_car.h5", self.key,
@@ -202,7 +205,7 @@ class Demand:
 
     def __load_hgv_demand(self):
         """Load the hgv demand for a specified scenario."""
-        path = str(DEMAND_PATH) + f"/{self.scenario_code}/"
+        path = str(self.demand_path) + f"/{self.scenario_code}/"
         # Iterate through all model years loading and appending demand.
         demand = pd.read_hdf(f"{path}vkm_by_speed_and_type_{self.year}_{self.time_period}_hgv.h5", self.key,
                              mode="r")
@@ -212,7 +215,7 @@ class Demand:
 
     def __load_lgv_demand(self):
         """Load the lgv demand for a specified scenario."""
-        path = str(DEMAND_PATH) + f"/{self.scenario_code}/"
+        path = str(self.demand_path) + f"/{self.scenario_code}/"
 
         # Iterate through all model years loading and appending demand.
         demand = pd.read_hdf(f"{path}vkm_by_speed_and_type_{self.year}_{self.time_period}_lgv.h5", self.key,
