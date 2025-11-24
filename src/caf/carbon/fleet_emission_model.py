@@ -31,7 +31,7 @@ class FleetEmissionsModel:
 
         # %% Scenario Dependent
 
-        for i in parameters.scenario_list:
+        for i in parameters.scenarios:
             print("\n\n\n###################")
             print(i)
             print("###################")
@@ -45,7 +45,7 @@ class FleetEmissionsModel:
                 self.first_enumeration = True
                 for time_period in ["TS1", "TS2", "TS3"]:
                     print(f"Running {time_period} {year}")
-                    keystoenum = pd.HDFStore(parameters.demand_path + f"/{scenario.scenario_code}/"
+                    keystoenum = pd.HDFStore(str(parameters.demand_path) + f"/{scenario.scenario_code}/"
                                              + f"vkm_by_speed_and_type_{year}_{time_period}_car.h5", mode="r").keys()
                     for demand_key in keystoenum:
                         print(f"Processing demand for key {demand_key}")

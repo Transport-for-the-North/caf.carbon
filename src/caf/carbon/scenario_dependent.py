@@ -83,7 +83,8 @@ class Scenario:
             self.km_index_reductions = ut.new_load_scenario_tables(
                 self.scenario_name, "ChainageReduction", parameters, suffix=pathway
             )
-            self.co2_reductions = ut.new_load_scenario_tables(self.scenario_name, "co2Reduction", suffix=pathway)
+            self.co2_reductions = ut.new_load_scenario_tables(self.scenario_name, "co2Reduction",
+                                                              parameters, suffix=pathway)
             self.km_index_reductions = ut.new_load_scenario_tables(
                 self.scenario_name, "ChainageReduction", parameters, suffix=pathway
             )

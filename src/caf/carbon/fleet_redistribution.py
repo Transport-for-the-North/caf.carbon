@@ -1,6 +1,5 @@
 # Built-Ins
 from datetime import datetime
-from caf.carbon.load_data import OUT_PATH, DEMOGRAPHICS_DATA, TRAVELLER_DATA
 
 
 # Third Party
@@ -10,7 +9,7 @@ import pandas as pd
 class Redistribution:
     """Redistribute the vehicle fleet, using a determined relation from socioeconomic factors."""
 
-    def __init__(self, invariant_obj, scenario_obj, projected_fleet, run_fresh):
+    def __init__(self, invariant_obj, scenario_obj, projected_fleet, parameters):
         """Initialise functions and set class variables.
 
         Parameters
@@ -20,14 +19,14 @@ class Redistribution:
         scenario_obj : class obj
             Includes scenario tables.
         """
-        self.outpath = OUT_PATH
+        self.outpath = parameters.outpath
         self.invariant = invariant_obj
         self.scenario = scenario_obj
         self.projected_fleet = projected_fleet.copy()
         self.date = datetime.today().strftime("%Y_%m_%d")
 
-        if run_fresh:
-            self.__input_weights()
+        if parameters.run_fresh:
+            self.__input_weights(parameters)
             self.__redistribution_parameters()
         else:
             self.__load_resdistributed_data()
@@ -40,11 +39,11 @@ class Redistribution:
             "{self.outpath}audit/fleet_weights.csv".format(**locals())
         )
 
-    def __input_weights(self):
+    def __input_weights(self, parameters):
         """Build EV weights if necessary."""
-        base_pop = pd.read_csv(DEMOGRAPHICS_DATA, compression="bz2")
+        base_pop = pd.read_csv(parameters.demographic_data, compression="bz2")
         base_pop = base_pop[["MSOA", "tfn_tt", "people"]].rename(columns={"MSOA": "zone"})
-        traveller_types = pd.read_csv(TRAVELLER_DATA)
+        traveller_types = pd.read_csv(parameters.traveller_data)
         # deselect traveller types who can not own cars
         deselection_criteria = [["age_str", "under 16"], ["hh_cars", 0]]
         traveller_types["selection"] = 1

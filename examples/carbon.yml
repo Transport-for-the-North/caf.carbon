@@ -7,13 +7,13 @@ regions:
 # Which travel scenarios to run with? Business As Usual Core", "Accelerated EV Core
 # or Just About Managing, Prioritised Places, Digitally Distributed, Urban Zero Carbon
 scenarios:
-  - "Business As Usual Core"
+  - Business As Usual Core
 
 # Is the model framework being run for the first time? This will create mediating files like the base year fleet
 # which do not need to be run every time
-run_fresh: True
+run_fresh: False
 # Is the model following a strategy trajectory? Default "none" will simply follow scenarios.
-pathway: "none"  # Options include "none", "decarb", "old"
+pathway: none  # Options include "none", "decarb", "old"
 
 # PREPROCESSING PARAMETERS #
 run_preprocessing: False
@@ -73,10 +73,10 @@ msoa_lad: D:\GitHub\caf.carbon\CAFCarb\lookup\MSOA_LAD_lookup.csv
 msoa_area_type: D:\GitHub\caf.carbon\CAFCarb\lookup\areaTypesMSOA.csv
 target_area_type: D:\GitHub\caf.carbon\CAFCarb\lookup\New Area Types.csv
 anpr: D:\GitHub\caf.carbon\CAFCarb\lookup\ANPR_data_North.xlsx
-TRAVELLER_DATA: D:\GitHub\caf.carbon\CAFCarb\input\ev_weights\tfn_traveller_type.csv
+traveller_data: D:\GitHub\caf.carbon\CAFCarb\input\ev_weights\tfn_traveller_type.csv
 log_path: D:\GitHub\caf.carbon\CAFCarb\outputs\cafcarbon.log
 noham_to_msoa: D:\GitHub\caf.carbon\CAFCarb\lookup\noham_msoa_pop_weighted_lookup.csv
-DEMOGRAPHICS_DATA: D:\GitHub\caf.carbon\CAFCarb\input\ev_weights\output_2_DDG_gb_msoa_tfn_tt_2023_Central_pop.csv.bz2
+demographic_data: D:\GitHub\caf.carbon\CAFCarb\input\ev_weights\output_2_DDG_gb_msoa_tfn_tt_2023_Central_pop.csv.bz2
 seg_share: D:\GitHub\caf.carbon\CAFCarb\input\2015_inputs\seg_prop_vtype_2015.csv
 fuel_share: D:\GitHub\caf.carbon\CAFCarb\input\2015_inputs\fuel_prop_segment_2015.csv
 demand_path: D:\GitHub\caf.carbon\CAFCarb\input\demand\TfN\detailed\

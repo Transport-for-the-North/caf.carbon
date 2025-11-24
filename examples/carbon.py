@@ -17,6 +17,8 @@ class CarbonConfig(ctk.BaseConfig):
 
     run_fleet: bool
     run_vkm: bool
+    scenarios: list[str]
+    pathway: str
     vkm_scenarios: list[str]
     run_fresh: bool
     run_preprocessing: bool
@@ -54,6 +56,8 @@ class CarbonConfig(ctk.BaseConfig):
     code_lookup: pydantic.FilePath
     log_path: str
     region_filter: pydantic.FilePath
+    demographic_data: pydantic.FilePath
+    traveller_data: pydantic.FilePath
 
 
 def main():
