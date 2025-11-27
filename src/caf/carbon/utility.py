@@ -2,6 +2,7 @@ import re
 import configparser as cf
 import pandas as pd
 from caf.carbon import audit_tests as at
+from caf.carbon.load_data import INPUT_PATH
 
 
 # %% Helper functions
@@ -56,8 +57,12 @@ def load_table(self, table_name, table_type=None, suffix="File"):
         header_row = 2
     if suffix in ["None", ""]:
         suffix = "File"
-    file_path = config["filePaths"][table_type + suffix]
+    file_path = str(INPUT_PATH) + "/" + config["filePaths"][table_type + suffix]
     # pylint: disable-all
+    print(file_path)
+    print(self.scenario_name)
+    print(config["fileStructure"][table_name])
+    print(header_row)
     table = pd.read_excel(
         io=file_path,
         sheet_name=self.scenario_name,
@@ -315,3 +320,54 @@ def interpolate_timeline(table_df, grouping_vars, value_var, melt=True):
     )
     table_df["year"] = table_df["year"].dt.year
     return table_df
+
+def new_load_general_table(sheet_name: str) -> pd.DataFrame:
+    """Load tables from Excel sheets. Remove the config.txt method and access the sheets into a df directly"""
+    config = cf.ConfigParser(interpolation=cf.ExtendedInterpolation())
+    config.read("config_local.txt")
+
+    if sheet_name in ["gridConsumption", "gridCarbonIntensity"]:
+        header_row = 2
+    else:
+        header_row = 0
+    file_path = r"D:\caf.carbon-EVCI\CAFCarb\input\general_tables.xlsx"
+    table = pd.read_excel(
+        io=file_path, sheet_name=sheet_name, header=header_row
+    ).dropna()
+
+    # pylint: enable-all
+    # Remove column suffixes (e.g. second 2018 column is called 2018.2)
+    table = table.rename(columns=lambda x: re.sub(r"\.[0-9]$", "", str(x)))
+    table = camel_columns_to_snake(table)
+    return table
+
+
+def new_load_scenario_tables(scenario: str, table_name: str, suffix) -> pd.DataFrame:
+    """Load scenario tables from inputs folder"""
+    # TODO(JC): - update in future
+    table_ranges = {
+        "segSales_propOfTypeYear": "A:H",
+        "fuelSales_propOfSegYear": "J:R",
+        "fleetSize_totOfYear": "T:Z",
+        "ptEmissionReduction": "AB:AH",
+        "co2Reduction": "AJ:AL",
+        "ChainageReduction": "AN:AU",
+    }
+
+    if suffix in ["none", ""]:
+        suffix = ".xlsx"
+    else:
+        suffix = "_" + suffix + ".xlsx"
+    use_cols = table_ranges[table_name]
+    file_path = r"D:\caf.carbon-EVCI\CAFCarb\input\scenario_tables_EVCI"
+    table = pd.read_excel(
+        io='{}{}'.format(file_path, suffix),
+        sheet_name=scenario,
+        usecols=use_cols,
+        header=1
+    ).dropna()
+
+    table = table.rename(columns=lambda x: re.sub(r"\.[0-9]$", "", str(x)))
+    table = camel_columns_to_snake(table)
+
+    return table

@@ -7,4 +7,3 @@
 -	the supporting emissions tools, such as rail, bus and freight emissions.
 """
 
-from ._version import __version__

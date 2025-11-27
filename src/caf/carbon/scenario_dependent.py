@@ -1,14 +1,14 @@
 import pandas as pd
 from caf.carbon import utility as ut
 import configparser as cf
-from caf.carbon.load_data import SEG_SHARE, FUEL_SHARE, DEMAND_PATH
+from caf.carbon.load_data import SEG_SHARE, FUEL_SHARE, DEMAND_PATH, VKM_BENCHMARK
 
 
 class Scenario:
     """Load in and preprocess scenario variant tables."""
 
     def __init__(
-        self, region_filter, time_period, time, scenario_name, invariant_obj, pathway="none"
+        self, region_filter, time_period, time, scenario_name, invariant_obj, regions, pathway="none",
     ):
         """Initialise functions and set class variables.
 
@@ -27,7 +27,9 @@ class Scenario:
         self.time_period = time_period
         self.time = time
         self.type = "scenario"
+        self.hgv_adjust, self.lgv_adjust, self.car_adjust = 1, 1, 1
         self.region_filter = region_filter
+        self.regions = regions
         self.scenario_name = scenario_name
         self.invariant = invariant_obj
         self.index_year = invariant_obj.index_year
@@ -40,35 +42,43 @@ class Scenario:
         """Gives the initials and scenario number for a given scenario."""
         self.scenario_initials = {
             "Business As Usual Core": "BAU",
-            "Business As Usual High": "BAUH",
-            "Business As Usual Low": "BAUL",
+            "Just About Managing": "JAM",
+            "Live Local": "LL",
             "Accelerated EV Core": "AE",
-            "Accelerated EV High": "AEH",
-            "Accelerated EV Low": "AEL",
+            "Digitally Distributed": "DD",
+            "Metropolitan Mobility": "MM",
         }[self.scenario_name]
         self.scenario_code = {
-            "BAU": "SC01",
-            "BAUH": "SC03",
-            "BAUL": "SC05",
-            "AE": "SC02",
-            "AEH": "SC04",
-            "AEL": "SC06",
+            "JAM": "SC01",
+            "DD": "SC03",
+            "BAU": "SC05",
+            "LL": "SC02",
+            "MM": "SC04",
+            "AE": "SC06",
         }[self.scenario_initials]
 
     def __load_scenario(self, pathway="none"):
         """Load in scenario tables."""
-        self.seg_share_of_year_type_sales = ut.load_table(
-            self, "segSales_propOfTypeYear", suffix=pathway.capitalize()
+
+        self.seg_share_of_year_type_sales = ut.new_load_scenario_tables(
+            self.scenario_name, "segSales_propOfTypeYear", suffix=pathway
         )
-        self.fuel_share_of_year_seg_sales = ut.load_table(
-            self, "fuelSales_propOfSegYear", suffix=pathway.capitalize()
+        self.fuel_share_of_year_seg_sales = ut.new_load_scenario_tables(
+            self.scenario_name, "fuelSales_propOfSegYear", suffix=pathway
         )
-        self.type_fleet_size_growth = ut.load_table(
-            self, "fleetSize_totOfYear", suffix=pathway.capitalize()
+        self.type_fleet_size_growth = ut.new_load_scenario_tables(
+            self.scenario_name, "fleetSize_totOfYear", suffix=pathway
         )
-        self.co2_reductions = ut.load_table(self, "co2Reduction", suffix=pathway.capitalize())
-        self.km_index_reductions = ut.load_table(
-            self, "ChainageReduction", suffix=pathway.capitalize()
+        self.co2_reductions = ut.new_load_scenario_tables(
+            self.scenario_name, "co2Reduction", suffix=pathway
+        )
+        self.km_index_reductions = ut.new_load_scenario_tables(
+            self.scenario_name, "ChainageReduction", suffix=pathway
+        )
+        self.co2_reductions = ut.new_load_scenario_tables(self.scenario_name, "co2Reduction",
+                                                          suffix=pathway)
+        self.km_index_reductions = ut.new_load_scenario_tables(
+            self.scenario_name, "ChainageReduction", suffix=pathway
         )
         # File paths are different if the index year is 2015
         # Carry out some preprocessing so the tables are consistent with 2018 inputs
@@ -88,6 +98,7 @@ class Scenario:
 
     def __warp_tables(self):
         """Preprocess and transform scenario inputs."""
+        print(self.seg_share_of_year_type_sales)
         self.seg_share_of_year_type_sales = ut.interpolate_timeline(
             self.seg_share_of_year_type_sales,
             grouping_vars=["segment"],
@@ -141,9 +152,6 @@ class Scenario:
         demand = self.__load_demand("car")
         demand = pd.concat([demand, self.__load_demand("lgv")], ignore_index=True)
         self.demand = pd.concat([demand, self.__load_demand("hgv")], ignore_index=True)
-        # self.demand = self.demand.loc[
-        #     self.demand["zone"].isin(self.region_filter["msoa11_id"])
-        # ].reset_index(drop=True)
 
     def __load_car_demand(self):
         """Load the car demand for a specified scenario."""
@@ -155,7 +163,7 @@ class Scenario:
                 f"{path}vkm_by_speed_and_type_{self.index_year}_car_{self.time}.csv"
             )
             demand["year"] = self.index_year
-            for i in range(2020, 2055, 5):
+            for i in range(2025, 2055, 5):
                 x = pd.read_csv(f"{path}vkm_by_speed_and_type_{i}_car_{self.time}.csv")
                 x["year"] = i
                 demand = demand.append(x)
@@ -166,7 +174,7 @@ class Scenario:
             # Iterate through all model years loading and appending demand.
             demand = pd.read_csv(f"{path}vkm_by_speed_and_type_{self.index_year}_car.csv")
             demand["year"] = self.index_year
-            for i in range(2020, 2055, 5):
+            for i in range(2025, 2055, 5):
                 x = pd.read_csv(f"{path}vkm_by_speed_and_type_{i}_car.csv")
                 x["year"] = i
                 demand = demand.append(x)
@@ -184,7 +192,7 @@ class Scenario:
                 f"{path}vkm_by_speed_and_type_{self.index_year}_hgv_{self.time}.csv"
             )
             demand["year"] = self.index_year
-            for i in range(2020, 2055, 5):
+            for i in range(2025, 2055, 5):
                 x = pd.read_csv(f"{path}vkm_by_speed_and_type_{i}_hgv_{self.time}.csv")
                 x["year"] = i
                 demand = demand.append(x)
@@ -194,7 +202,7 @@ class Scenario:
             # Iterate through all model years loading and appending demand.
             demand = pd.read_csv(f"{path}vkm_by_speed_and_type_{self.index_year}_hgv.csv")
             demand["year"] = self.index_year
-            for i in range(2020, 2055, 5):
+            for i in range(2025, 2055, 5):
                 x = pd.read_csv(f"{path}vkm_by_speed_and_type_{i}_hgv.csv")
                 x["year"] = i
                 demand = demand.append(x)
@@ -213,7 +221,7 @@ class Scenario:
                 f"{path}vkm_by_speed_and_type_{self.index_year}_lgv_{self.time}.csv"
             )
             demand["year"] = self.index_year
-            for i in range(2020, 2055, 5):
+            for i in range(2025, 2055, 5):
                 x = pd.read_csv(f"{path}vkm_by_speed_and_type_{i}_lgv_{self.time}.csv")
                 x["year"] = i
                 demand = demand.append(x)
@@ -223,7 +231,7 @@ class Scenario:
             # Iterate through all model years loading and appending demand.
             demand = pd.read_csv(f"{path}vkm_by_speed_and_type_{self.index_year}_lgv.csv")
             demand["year"] = self.index_year
-            for i in range(2020, 2055, 5):
+            for i in range(2025, 2055, 5):
                 x = pd.read_csv(f"{path}vkm_by_speed_and_type_{i}_lgv.csv")
                 x["year"] = i
                 demand = demand.append(x)
@@ -235,26 +243,51 @@ class Scenario:
         """Load in and preprocess demand data for a given vehicle type."""
         new_cols = [
             "zone",
+            "vehicle_type",
             "road_type",
+            "Vol",
+            "0_10",
             "10_30",
             "30_50",
             "50_70",
             "70_90",
             "90_110",
+            "110_130",
             "total_vehicle_km",
             "year",
         ]
-        original_cols = [
-            "origin_zone",
-            "road_type",
-            "vkm_10-30_kph",
-            "vkm_30-50_kph",
-            "vkm_50-70_kph",
-            "vkm_70-90_kph",
-            "vkm_90-110_kph",
-            "total_vehicle_km",
-            "year",
-        ]
+        if self.regions == ["Transport for the North"]:
+            original_cols = [
+                "origin_zone",
+                "vehicle_type",
+                "road_type",
+                "Vol",
+                "vkm_0-10kph",
+                "vkm_10-30kph",
+                "vkm_30-50kph",
+                "vkm_50-70kph",
+                "vkm_70-90kph",
+                "vkm_90-110kph",
+                "vkm_110-130kph",
+                "total_vehicle_km",
+                "year",
+            ]
+        else:
+            original_cols = [
+                "origin_zone",
+                "vehicle_type",
+                "road_type",
+                "Vol",
+                "vkm_0-10_kph",
+                "vkm_10-30_kph",
+                "vkm_30-50_kph",
+                "vkm_50-70_kph",
+                "vkm_70-90_kph",
+                "vkm_90-110_kph",
+                "vkm_110-130_kph",
+                "total_vehicle_km",
+                "year",
+            ]
         if vehicle_type == "car":
             demand = self.__load_car_demand()
         elif vehicle_type == "hgv":
@@ -264,10 +297,11 @@ class Scenario:
         demand["vehicle_type"] = vehicle_type
         # this column only relevant for when hgv/lgv growth is not modeled
         demand["km_growth"] = 1
-
         # Rename columns so they are consistent across vehicle type
         rename_cols = dict(zip(original_cols, new_cols))
         demand = demand.rename(columns=rename_cols)
+        if self.regions == ["Transport for the North"]:
+            demand["10_30"] = demand["10_30"] + demand["0_10"]
         demand = demand[
             [
                 "zone",
@@ -302,4 +336,5 @@ class Scenario:
         demand.loc[demand["road_type"] == "motorway", "road_type"] = "Motorway"
         demand.loc[demand["road_type"] == "urban", "road_type"] = "Urban"
         demand.loc[demand["road_type"] == "rural", "road_type"] = "Rural"
+        demand = demand.loc[demand["zone"].isin(self.region_filter["msoa21_id"])].reset_index(drop=True)
         return demand

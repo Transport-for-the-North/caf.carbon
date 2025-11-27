@@ -10,6 +10,7 @@ class FleetEmissionsModel:
     def __init__(self, regions, ev_redistribution, time_period, scenario_list, run_fresh, run_name):
         # %% Load config file
         region_filter = pd.read_csv(REGION_FILTER)
+        region_filter = region_filter.drop_duplicates()
         region_filter = region_filter[region_filter["region"].isin(regions)]
 
         # Specify if NoHAM demand inputs are separated into AM, IP, PM time periods
@@ -20,7 +21,6 @@ class FleetEmissionsModel:
 
         # %% Scenario Agnostic
         index_fleet = scenario_invariant.IndexFleet(run_fresh)
-        index_fleet.fleet.to_csv("index fleet new.csv")
         invariant_data = scenario_invariant.Invariant(index_fleet, time_period)
 
         # State whether you want to generate baseline projections or decarbonization
@@ -33,7 +33,7 @@ class FleetEmissionsModel:
                 print(i, time)
                 print("###################")
                 scenario = scenario_dependent.Scenario(
-                    region_filter, time_period, time, i, invariant_data, pathway
+                    region_filter, time_period, time, i, invariant_data, regions, pathway,
                 )
                 model = projection.Model(
                     time,

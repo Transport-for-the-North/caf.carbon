@@ -69,7 +69,6 @@ class Imputation:
         reduced_fleet_df = fleet_df.loc[
             fleet_df["vehicle_type"] == vehicle_type, ["segment", "avg_mass"]
         ]
-        print(reduced_fleet_df["avg_mass"])
 
         if vehicle_type == "car":
             # Use the 25th percentile of mass for each car segment as the bin boundaries.
@@ -137,7 +136,7 @@ class CurveFitting:
 
         # Calculate how many years into the group the selected year is
         # and the number of years until the end of the group
-        # e.g. cya = 17 is in the 15-20 group so its 3rd in the group, 3 from the end
+        # e.g. cya = 17 is in the 15-20 group, so it's 3rd in the group, 3 from the end
         fleet_archive["cohort"] = fleet_archive["year"] - fleet_archive["cya"]
         fleet_archive = fleet_archive.sort_values(["cohort", "cya"], ascending=[True, True])
         fleet_archive["position_in_group"] = fleet_archive.apply(
@@ -189,13 +188,11 @@ class CurveFitting:
             "{avg_co2}*12/44 /1000/{density}*100/{carbon_ef}*1000".format_map, axis=1
         ).map(eval)
         table_df["fc_in_use"] = table_df.apply(
-            "{params1} + {params2}*{avg_es} + {params3}*{avg_mass} + {params4}*{fc_approval}".format_map,
+            "{params1} + {params2}*{avg_cc} + {params3}*{avg_mass} + {params4}*{fc_approval}".format_map,
             axis=1,
         ).map(eval)
-
         table_df["rw_multiplier"] = table_df["fc_in_use"] / table_df["fc"]
         table_df = table_df[["cohort", "segment", "fuel", "vehicle_type", "rw_multiplier"]]
-
         characteristics = characteristics[["cohort", "segment", "fuel", "vehicle_type"]]
         characteristics = ut.determine_fuel_type(characteristics)
         # If no real word correction can be calculated, set it as 1.
@@ -205,7 +202,7 @@ class CurveFitting:
         )
         # PHEVs operate in electric mode 50% of the time.
         rw_multiplier.loc[rw_multiplier["fuel_type"] == "phev", "rw_multiplier"] = (
-            rw_multiplier["rw_multiplier"] * 0.5
+                rw_multiplier["rw_multiplier"] * 0.5
         )
         return rw_multiplier
 
@@ -371,13 +368,29 @@ class IndexFleet:
             & (fleet_archive["fuel"].isin(["hev", "phev"])),
             "fuel",
         ] = "bev"
-        # Determine missing CYA from eurostandard and vehicle type
-        # fleet_archive = ut.determine_from_similar(
-        #     fleet_archive,
-        #     shared_qualities=["year", "vehicle_type", "euro_standard"],
-        #     missing_quality="cya",
-        #     value_to_distribute="tally",
-        # )
+        fleet_archive.loc[
+            (fleet_archive["vehicle_type"].isin(["hgv"]))
+            & (fleet_archive["fuel"].isin(["petrol", "petrol hybrid"])),
+            "fuel",
+        ] = "diesel"
+        fleet_archive.loc[
+            (fleet_archive["vehicle_type"] == "lgv")
+            & (fleet_archive["fuel"] == "petrol hybrid"),
+            "fuel",
+        ] = "phev"
+        fleet_archive = fleet_archive.groupby(
+            [
+                "year",
+                "avg_co2",
+                "avg_mass",
+                "avg_cc",
+                "zone",
+                "vehicle_type",
+                "segment",
+                "fuel"
+            ],
+            as_index=False
+        ).sum()
         fleet_archive["cya"] = self.fleet_index_year
         fleet_archive["cya"] = fleet_archive["cya"] - fleet_archive["year"]
         fleet_archive["year"] = self.fleet_index_year
@@ -444,68 +457,6 @@ class IndexFleet:
             fleet_df.groupby(ut.all_but(fleet_df, "tally"))["tally"].sum().reset_index()
         )
 
-    def __map_zones(self):
-        """Translate fleet data from LAD to MSOA zones.
-
-        Uses the MSOA tally and the LAD vehicle shares to proportionately
-        assign vehicles to MSOA zones.
-        """
-        # Aggregate the fleet data to the MSOA Zone level
-        fleet_df = self.fleet.copy()
-
-        # Calculate the share each vehicle makes up of its vehicle type in its LAD
-        group_by_segment = (
-            fleet_df.groupby(ut.all_but(fleet_df, "tally"))["tally"].sum().reset_index()
-        )
-        group_by_segment = group_by_segment.drop(columns="year")
-        group_by_segment["shr_of_lad_type"] = group_by_segment["tally"] / fleet_df.groupby(
-            ["zone", "vehicle_type"]
-        )["tally"].transform("sum")
-        # Vehicle type tally by MSOA
-        msoa_bodytype = pd.read_csv(MSOA_BODY).fillna(0)
-        msoa_bodytype = pd.melt(
-            msoa_bodytype,
-            id_vars="MSOA11CD",
-            var_name="vehicle_type",
-            value_vars=["Cars", "LGVs", "Goods"],
-            value_name="msoa_tally",
-        )
-        msoa_bodytype["vehicle_type"] = msoa_bodytype["vehicle_type"].replace(
-            {"Cars": "car", "LGVs": "lgv", "Goods": "hgv"}
-        )
-        # Connects LAD to MSOA
-        msoa_lad_lookup = pd.read_csv(MSOA_LAD)
-        # join on msoa, group by msoa zones & any categories, sum by msoa zones & any categories
-        msoa_zones = pd.read_csv(NOHAM_TO_MSOA).rename(columns={"msoa11cd": "MSOA11CD"})
-        msoa_zones = msoa_zones.merge(msoa_lad_lookup, on="MSOA11CD")
-        vehicle_msoa_zones = pd.merge(msoa_zones, msoa_bodytype, on="MSOA11CD", how="inner")
-        vehicle_msoa_zones = vehicle_msoa_zones.groupby(
-            ["MSOA11CD", "vehicle_type", "TAG_LAD"], as_index=False
-        ).sum()
-        merged_data = vehicle_msoa_zones.merge(
-            group_by_segment,
-            left_on=["TAG_LAD", "vehicle_type"],
-            right_on=["zone", "vehicle_type"],
-        )
-        merged_data = merged_data.loc[merged_data["msoa_tally"] > 0]
-
-        # MSOA Tally for vehicle equals Vehicle share of LAD * MSOA total tally
-        merged_data["tally"] = merged_data["shr_of_lad_type"] * merged_data["msoa_tally"]
-        merged_data = (
-            merged_data.groupby(
-                ["MSOA11CD", "segment", "cohort", "fuel", "vehicle_type", "msoa_tally"]
-            )["tally"]
-            .sum()
-            .reset_index()
-        )
-        merged_data["tally"] = merged_data["tally"].round().astype(int)
-
-        # Write out
-        vehicle_types = fleet_df[["year", "segment", "vehicle_type"]].drop_duplicates()
-        merged_data = merged_data.rename(columns={"MSOA11CD": "zone"})
-        merged_data = merged_data[["cohort", "fuel", "segment", "zone", "tally"]]
-        self.fleet = merged_data.merge(vehicle_types, on="segment", how="left")
-
 
 class Invariant:
     """Import and preprocess scenario invariant tables (baseline inputs)."""
@@ -525,7 +476,7 @@ class Invariant:
         self.time_period = time_period
         self.type = "general"
         self.scenario_name = "general"
-        self.index_year = 2018
+        self.index_year = 2023
         self.save_invariant = True
         # Choose a scenario for grid carbon intensity
         self.grid_intensity_scenario = "CCC Balanced"  # Options include CCC Balanced or TAG
@@ -565,20 +516,20 @@ class Invariant:
 
     def __import_shared_tables(self):
         """Import scenario invariant/baseline inputs."""
-        self.real_world_coefficients = ut.load_table(self, "realWorldAttributes")
-        self.fuel_characteristics = ut.load_table(self, "fuelCharacteristics")
-        self.yearly_co2_reduction = ut.load_table(self, "newVehicleCarbonReduction")
-        self.biofuel_reduction = ut.load_table(self, "fuelComposition")
-        self.ghg_equivalent = ut.load_table(self, "GHGEquivalent")
-        self.pt_ghg_factor = ut.load_table(self, "PTGHGEquivalent")
+        self.real_world_coefficients = ut.new_load_general_table("realWorldAttributes")
+        self.fuel_characteristics = ut.new_load_general_table("fuelCharacteristics")
+        self.yearly_co2_reduction = ut.new_load_general_table("newVehicleCarbonReduction")
+        self.biofuel_reduction = ut.new_load_general_table("fuelComposition")
+        self.ghg_equivalent = ut.new_load_general_table("GHGEquivalent")
+        self.pt_ghg_factor = ut.new_load_general_table("PTGHGEquivalent")
         self.naei_coefficients = ut.load_csv(self, "naei")
-        self.grid_consumption = ut.load_table(self, "gridConsumption", table_type="gridCo2")
-        self.grid_intensity = ut.load_table(self, "gridCarbonIntensity", table_type="gridCo2")
+        self.grid_consumption = ut.new_load_general_table("gridConsumption")
+        self.grid_intensity = ut.new_load_general_table("gridCarbonIntensity")
 
-        self.msoa_area_info = pd.read_csv(MSOA_AREA_TYPE)
-        self.msoa_area_info = self.msoa_area_info.rename(
-            columns={"msoaZoneID": "zone", "R": "msoa_area_type"}
-        )
+        # self.msoa_area_info = pd.read_csv(MSOA_AREA_TYPE)
+        # self.msoa_area_info = self.msoa_area_info.rename(
+        #     columns={"msoaZoneID": "zone", "R": "msoa_area_type"}
+        # )
         self.new_area_types = pd.read_csv(TARGET_AREA_TYPE)
         self.new_area_types = self.new_area_types.rename(
             columns={"msoa_area_code": "zone", "tfn_area_type": "msoa_area_type"}
@@ -586,36 +537,36 @@ class Invariant:
 
         if self.time_period:
             # Check that baseline demand is the same across scenarios
-            car_sc01_baseline_demand_am = pd.read_csv(
-                str(DEMAND_PATH) + f"/SC01/vkm_by_speed_and_type_{self.index_year}_car_AM.csv"
+            car_sc05_baseline_demand_am = pd.read_csv(
+                str(DEMAND_PATH) + f"/sc05/vkm_by_speed_and_type_{self.index_year}_car_AM.csv"
             )
-            car_sc01_baseline_demand_ip = pd.read_csv(
-                str(DEMAND_PATH) + f"/SC01/vkm_by_speed_and_type_{self.index_year}_car_IP.csv"
+            car_sc05_baseline_demand_ip = pd.read_csv(
+                str(DEMAND_PATH) + f"/sc05/vkm_by_speed_and_type_{self.index_year}_car_IP.csv"
             )
-            car_sc01_baseline_demand_pm = pd.read_csv(
-                str(DEMAND_PATH) + f"/SC01/vkm_by_speed_and_type_{self.index_year}_car_PM.csv"
+            car_sc05_baseline_demand_pm = pd.read_csv(
+                str(DEMAND_PATH) + f"/sc05/vkm_by_speed_and_type_{self.index_year}_car_PM.csv"
             )
-            car_sc01_baseline_demand = pd.concat(
+            car_sc05_baseline_demand = pd.concat(
                 [
-                    car_sc01_baseline_demand_am,
-                    car_sc01_baseline_demand_ip,
-                    car_sc01_baseline_demand_pm,
+                    car_sc05_baseline_demand_am,
+                    car_sc05_baseline_demand_ip,
+                    car_sc05_baseline_demand_pm,
                 ]
             )
-            car_sc01_baseline_demand["year"] = self.index_year
-            car_sc01_baseline_demand = car_sc01_baseline_demand.loc[
-                car_sc01_baseline_demand.road_type == "Motorway", "total_vehicle_km"
+            car_sc05_baseline_demand["year"] = self.index_year
+            car_sc05_baseline_demand = car_sc05_baseline_demand.loc[
+                car_sc05_baseline_demand.road_type == "Motorway", "total_vehicle_km"
             ].sum()
             for scenario_code in ["SC02", "SC03", "SC04", "SC05", "SC06"]:
                 path = str(DEMAND_PATH) + f"/{scenario_code}/"
                 car_scenario_baseline_demand_am = pd.read_csv(
-                    path + "/vkm_by_speed_and_type_2018_car_AM.csv"
+                    path + "/vkm_by_speed_and_type_2023_car_AM.csv"
                 )
                 car_scenario_baseline_demand_ip = pd.read_csv(
-                    path + "/vkm_by_speed_and_type_2018_car_IP.csv"
+                    path + "/vkm_by_speed_and_type_2023_car_IP.csv"
                 )
                 car_scenario_baseline_demand_pm = pd.read_csv(
-                    path + "/vkm_by_speed_and_type_2018_car_PM.csv"
+                    path + "/vkm_by_speed_and_type_2023_car_PM.csv"
                 )
                 car_scenario_baseline_demand = pd.concat(
                     [
@@ -628,62 +579,62 @@ class Invariant:
                 car_scenario_baseline_demand = car_scenario_baseline_demand.loc[
                     car_scenario_baseline_demand.road_type == "Motorway", "total_vehicle_km"
                 ].sum()
-                if np.round(car_sc01_baseline_demand) != np.round(
+                if np.round(car_sc05_baseline_demand) != np.round(
                     car_scenario_baseline_demand
                 ):
                     print("\n****!! Car Baseline demand varies across scenarios!!***\n")
             # gv demand equivalents
-            hgv_sc01_baseline_demand_am = pd.read_csv(
-                str(DEMAND_PATH) + f"/SC01/vkm_by_speed_and_type_{self.index_year}_hgv_AM.csv"
+            hgv_sc05_baseline_demand_am = pd.read_csv(
+                str(DEMAND_PATH) + f"/sc05/vkm_by_speed_and_type_{self.index_year}_hgv_AM.csv"
             )
-            hgv_sc01_baseline_demand_ip = pd.read_csv(
-                str(DEMAND_PATH) + f"/SC01/vkm_by_speed_and_type_{self.index_year}_hgv_IP.csv"
+            hgv_sc05_baseline_demand_ip = pd.read_csv(
+                str(DEMAND_PATH) + f"/sc05/vkm_by_speed_and_type_{self.index_year}_hgv_IP.csv"
             )
-            hgv_sc01_baseline_demand_pm = pd.read_csv(
-                str(DEMAND_PATH) + f"/SC01/vkm_by_speed_and_type_{self.index_year}_hgv_PM.csv"
+            hgv_sc05_baseline_demand_pm = pd.read_csv(
+                str(DEMAND_PATH) + f"/sc05/vkm_by_speed_and_type_{self.index_year}_hgv_PM.csv"
             )
-            hgv_sc01_baseline_demand = pd.concat(
+            hgv_sc05_baseline_demand = pd.concat(
                 [
-                    hgv_sc01_baseline_demand_am,
-                    hgv_sc01_baseline_demand_ip,
-                    hgv_sc01_baseline_demand_pm,
+                    hgv_sc05_baseline_demand_am,
+                    hgv_sc05_baseline_demand_ip,
+                    hgv_sc05_baseline_demand_pm,
                 ]
             )
-            hgv_sc01_baseline_demand["year"] = self.index_year
-            hgv_sc01_baseline_demand = hgv_sc01_baseline_demand.loc[
-                hgv_sc01_baseline_demand.road_type == "Motorway", "total_vehicle_km"
+            hgv_sc05_baseline_demand["year"] = self.index_year
+            hgv_sc05_baseline_demand = hgv_sc05_baseline_demand.loc[
+                hgv_sc05_baseline_demand.road_type == "Motorway", "total_vehicle_km"
             ].sum()
-            lgv_sc01_baseline_demand_am = pd.read_csv(
-                str(DEMAND_PATH) + f"/SC01/vkm_by_speed_and_type_{self.index_year}_lgv_AM.csv"
+            lgv_sc05_baseline_demand_am = pd.read_csv(
+                str(DEMAND_PATH) + f"/sc05/vkm_by_speed_and_type_{self.index_year}_lgv_AM.csv"
             )
-            lgv_sc01_baseline_demand_ip = pd.read_csv(
-                str(DEMAND_PATH) + f"/SC01/vkm_by_speed_and_type_{self.index_year}_lgv_IP.csv"
+            lgv_sc05_baseline_demand_ip = pd.read_csv(
+                str(DEMAND_PATH) + f"/sc05/vkm_by_speed_and_type_{self.index_year}_lgv_IP.csv"
             )
-            lgv_sc01_baseline_demand_pm = pd.read_csv(
-                str(DEMAND_PATH) + f"/SC01/vkm_by_speed_and_type_{self.index_year}_lgv_PM.csv"
+            lgv_sc05_baseline_demand_pm = pd.read_csv(
+                str(DEMAND_PATH) + f"/sc05/vkm_by_speed_and_type_{self.index_year}_lgv_PM.csv"
             )
-            lgv_sc01_baseline_demand = pd.concat(
+            lgv_sc05_baseline_demand = pd.concat(
                 [
-                    lgv_sc01_baseline_demand_am,
-                    lgv_sc01_baseline_demand_ip,
-                    lgv_sc01_baseline_demand_pm,
+                    lgv_sc05_baseline_demand_am,
+                    lgv_sc05_baseline_demand_ip,
+                    lgv_sc05_baseline_demand_pm,
                 ]
             )
-            lgv_sc01_baseline_demand["year"] = self.index_year
-            lgv_sc01_baseline_demand = lgv_sc01_baseline_demand.loc[
-                lgv_sc01_baseline_demand.road_type == "Motorway", "total_vehicle_km"
+            lgv_sc05_baseline_demand["year"] = self.index_year
+            lgv_sc05_baseline_demand = lgv_sc05_baseline_demand.loc[
+                lgv_sc05_baseline_demand.road_type == "Motorway", "total_vehicle_km"
             ].sum()
-            for scenario_code in ["SC02"]:
+            for scenario_code in ["SC06"]:
                 # hgv placeholder
                 path = str(DEMAND_PATH) + f"/{scenario_code}/"
                 hgv_scenario_baseline_demand_am = pd.read_csv(
-                    path + "vkm_by_speed_and_type_2018_hgv_AM.csv"
+                    path + "vkm_by_speed_and_type_2023_hgv_AM.csv"
                 )
                 hgv_scenario_baseline_demand_ip = pd.read_csv(
-                    path + "vkm_by_speed_and_type_2018_hgv_IP.csv"
+                    path + "vkm_by_speed_and_type_2023_hgv_IP.csv"
                 )
                 hgv_scenario_baseline_demand_pm = pd.read_csv(
-                    path + "vkm_by_speed_and_type_2018_hgv_PM.csv"
+                    path + "vkm_by_speed_and_type_2023_hgv_PM.csv"
                 )
                 hgv_scenario_baseline_demand = pd.concat(
                     [
@@ -696,20 +647,20 @@ class Invariant:
                 hgv_scenario_baseline_demand = hgv_scenario_baseline_demand.loc[
                     hgv_scenario_baseline_demand.road_type == "Motorway", "total_vehicle_km"
                 ].sum()
-                if np.round(hgv_sc01_baseline_demand) != np.round(
+                if np.round(hgv_sc05_baseline_demand) != np.round(
                     hgv_scenario_baseline_demand
                 ):
                     print("\n****!! HGV Baseline demand varies across scenarios!!***\n")
                 # lgv placeholder
                 path = str(DEMAND_PATH) + f"/{scenario_code}/"
                 lgv_scenario_baseline_demand_am = pd.read_csv(
-                    path + "vkm_by_speed_and_type_2018_lgv_AM.csv"
+                    path + "vkm_by_speed_and_type_2023_lgv_AM.csv"
                 )
                 lgv_scenario_baseline_demand_ip = pd.read_csv(
-                    path + "vkm_by_speed_and_type_2018_lgv_IP.csv"
+                    path + "vkm_by_speed_and_type_2023_lgv_IP.csv"
                 )
                 lgv_scenario_baseline_demand_pm = pd.read_csv(
-                    path + "vkm_by_speed_and_type_2018_lgv_PM.csv"
+                    path + "vkm_by_speed_and_type_2023_lgv_PM.csv"
                 )
                 lgv_scenario_baseline_demand = pd.concat(
                     [
@@ -722,66 +673,66 @@ class Invariant:
                 lgv_scenario_baseline_demand = lgv_scenario_baseline_demand.loc[
                     lgv_scenario_baseline_demand.road_type == "Motorway", "total_vehicle_km"
                 ].sum()
-                if np.round(lgv_sc01_baseline_demand) != np.round(
+                if np.round(lgv_sc05_baseline_demand) != np.round(
                     lgv_scenario_baseline_demand
                 ):
                     print("\n****!! LGV Baseline demand varies across scenarios!!***\n")
 
         if not self.time_period:
             # Check that baseline demand is the same across scenarios
-            car_sc01_baseline_demand = pd.read_csv(
-                str(DEMAND_PATH) + f"/SC01/vkm_by_speed_and_type_{self.index_year}_car.csv"
+            car_sc05_baseline_demand = pd.read_csv(
+                str(DEMAND_PATH) + f"/sc05/vkm_by_speed_and_type_{self.index_year}_car.csv"
             )
-            car_sc01_baseline_demand = car_sc01_baseline_demand.loc[
-                car_sc01_baseline_demand.road_type == "Motorway", "total_vehicle_km"
+            car_sc05_baseline_demand = car_sc05_baseline_demand.loc[
+                car_sc05_baseline_demand.road_type == "Motorway", "total_vehicle_km"
             ].sum()
-            for scenario_code in ["SC02"]:
+            for scenario_code in ["SC06"]:
                 path = str(DEMAND_PATH) + f"/{scenario_code}/"
                 car_scenario_baseline_demand = pd.read_csv(
-                    path + "vkm_by_speed_and_type_2018_car.csv"
+                    path + "vkm_by_speed_and_type_2023_car.csv"
                 )
                 car_scenario_baseline_demand = car_scenario_baseline_demand.loc[
                     car_scenario_baseline_demand.road_type == "Motorway", "total_vehicle_km"
                 ].sum()
-                if np.round(car_sc01_baseline_demand) != np.round(
+                if np.round(car_sc05_baseline_demand) != np.round(
                     car_scenario_baseline_demand
                 ):
                     print("\n****!! Car Baseline demand varies across scenarios!!***\n")
             # gv demand equivalents
-            hgv_sc01_baseline_demand = pd.read_csv(
-                str(DEMAND_PATH) + f"/SC01/vkm_by_speed_and_type_{self.index_year}_hgv.csv"
+            hgv_sc05_baseline_demand = pd.read_csv(
+                str(DEMAND_PATH) + f"/sc05/vkm_by_speed_and_type_{self.index_year}_hgv.csv"
             )
-            hgv_sc01_baseline_demand = hgv_sc01_baseline_demand.loc[
-                hgv_sc01_baseline_demand.road_type == "Motorway", "total_vehicle_km"
+            hgv_sc05_baseline_demand = hgv_sc05_baseline_demand.loc[
+                hgv_sc05_baseline_demand.road_type == "Motorway", "total_vehicle_km"
             ].sum()
-            lgv_sc01_baseline_demand = pd.read_csv(
-                str(DEMAND_PATH) + f"/SC01/vkm_by_speed_and_type_{self.index_year}_lgv.csv"
+            lgv_sc05_baseline_demand = pd.read_csv(
+                str(DEMAND_PATH) + f"/sc05/vkm_by_speed_and_type_{self.index_year}_lgv.csv"
             )
-            lgv_sc01_baseline_demand = lgv_sc01_baseline_demand.loc[
-                lgv_sc01_baseline_demand.road_type == "Motorway", "total_vehicle_km"
+            lgv_sc05_baseline_demand = lgv_sc05_baseline_demand.loc[
+                lgv_sc05_baseline_demand.road_type == "Motorway", "total_vehicle_km"
             ].sum()
-            for scenario_code in ["SC02"]:
+            for scenario_code in ["SC06"]:
                 # hgv placeholder
                 path = str(DEMAND_PATH) + f"/{scenario_code}/"
                 hgv_scenario_baseline_demand = pd.read_csv(
-                    path + "vkm_by_speed_and_type_2018_hgv.csv"
+                    path + "vkm_by_speed_and_type_2023_hgv.csv"
                 )
                 hgv_scenario_baseline_demand = hgv_scenario_baseline_demand.loc[
                     hgv_scenario_baseline_demand.road_type == "Motorway", "total_vehicle_km"
                 ].sum()
-                if np.round(hgv_sc01_baseline_demand) != np.round(
+                if np.round(hgv_sc05_baseline_demand) != np.round(
                     hgv_scenario_baseline_demand
                 ):
                     print("\n****!! HGV Baseline demand varies across scenarios!!***\n")
                 # lgv placeholder
                 path = str(DEMAND_PATH) + f"/{scenario_code}/"
                 lgv_scenario_baseline_demand = pd.read_csv(
-                    path + "vkm_by_speed_and_type_2018_lgv.csv"
+                    path + "vkm_by_speed_and_type_2023_lgv.csv"
                 )
                 lgv_scenario_baseline_demand = lgv_scenario_baseline_demand.loc[
                     lgv_scenario_baseline_demand.road_type == "Motorway", "total_vehicle_km"
                 ].sum()
-                if np.round(lgv_sc01_baseline_demand) != np.round(
+                if np.round(lgv_sc05_baseline_demand) != np.round(
                     lgv_scenario_baseline_demand
                 ):
                     print("\n****!! LGV Baseline demand varies across scenarios!!***\n")

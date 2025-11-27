@@ -103,8 +103,8 @@ class NormaliseOutputs:
         
         dft_segment = split_table(self.summary_outputs.all_scenarios, ["segment", "vehicle_type"])
         self.dft_segment = dft_segment[["segment", "vehicle_type"]]
-        self.scenario_code_name = {"Just About Managing": "SC01", "Prioritised Places": "SC02", "Digitally Distributed": "SC03", "Urban Zero Carbon": "SC04"}
-        scenario_initials = {"Just About Managing": "JAM", "Prioritised Places": "PP", "Digitally Distributed": "DD", "Urban Zero Carbon": "UZC"}
+        self.scenario_code_name = {"Just About Managing": "SC01", "Live Local": "SC02", "Digitally Distributed": "SC03", "Metropolitan Mobility": "SC04"}
+        scenario_initials = {"Just About Managing": "JAM", "Live Local": "LL", "Digitally Distributed": "DD", "Metropolitan Mobility": "MM"}
         future_travel_scenario = split_table(self.summary_outputs.all_scenarios, 
                                              ["scenario_full_name"], 
                                              "future_travel_scenario")

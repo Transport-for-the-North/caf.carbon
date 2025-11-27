@@ -187,20 +187,20 @@ class Model:
 
         if self.ev_redistribution:
             ev_projected_fleet = fleet_redistribution.Redistribution(
-                self.invariant, self.scenario, fleet_useful_years, True
+                self.invariant, self.scenario, fleet_useful_years, False
             ).projected_fleet
             self.projected_fleet = ev_projected_fleet
         else:
             self.projected_fleet = fleet_useful_years
 
-        if self.scenario.scenario_initials == "BAU":
+        if self.scenario.scenario_initials == "JAM":
             fleet_useful_years.to_csv(
                 f"{self.outpath}/audit/projected_fleet_{self.date}.csv", index=False
             )
         print("\rProjection complete.\n")
         # Iterate through all model years loading and appending demand.
         self.projected_fleet = self.projected_fleet.loc[
-            self.projected_fleet["zone"].isin(self.region_filter["msoa11_id"])
+            self.projected_fleet["zone"].isin(self.region_filter["msoa21_id"])
         ].reset_index(drop=True)
         return self.projected_fleet
 
@@ -219,7 +219,7 @@ class Model:
         )
         chainage["chainage"] = chainage["chainage"] * chainage["cya_prop_of_bt_rt"]
         chainage = (
-            chainage.groupby(["vehicle_type", "cya", "zone", "speed_band", "year"])["chainage"]
+            chainage.groupby(["vehicle_type", "cya", "zone", "road_type", "speed_band", "year"])["chainage"]
             .sum()
             .reset_index()
         )
@@ -276,34 +276,6 @@ class Model:
         fleet_df = fleet_df.merge(emission_change_df, how="left", on=["cohort", "body_type"])
         fleet_df["index_carbon_reduction"] = fleet_df["index_carbon_reduction"].fillna(1)
 
-        # petrol and diesel biofuel component reductions
-        bio_correction = self.invariant.biofuel_reduction
-        bins = bio_correction["switch_year"]
-        year_labels = []
-        for i in range(len(bio_correction["switch_year"])):
-            if i > 0:
-                year_labels.append(bio_correction["switch_year"].loc[i])
-
-        fleet_df["binned"] = pd.cut(fleet_df["year"], bins, labels=year_labels)
-        fleet_df["biocorrection"] = 1.0
-        for i in range(len(bio_correction["switch_year"])):
-            # petrol correction
-            fleet_df.loc[
-                (
-                    (fleet_df["fuel"] == "petrol")
-                    & (fleet_df["binned"] == bio_correction["switch_year"].loc[i])
-                ),
-                "biocorrection",
-            ] = bio_correction.loc[i]["petrol"]
-            # diesel correction
-            fleet_df.loc[
-                (
-                    (fleet_df["fuel"] == "diesel")
-                    & (fleet_df["binned"] == bio_correction["switch_year"].loc[i])
-                ),
-                "biocorrection",
-            ] = bio_correction.loc[i]["diesel"]
-
         # GHG equivalents
         ghg_factor = self.invariant.ghg_equivalent
         for i in range(len(ghg_factor)):
@@ -313,14 +285,13 @@ class Model:
                     & (fleet_df["segment"] == ghg_factor.loc[i]["segment"])
                 ),
                 "ghg_factor",
-            ] = ghg_factor.loc[i]["factor"]
+            ] = ghg_factor.loc[i]["ghg_factor"]
 
         # CO2 = CO2/km * km
         fleet_df["tailpipe_gco2"] = (
             fleet_df["gco2/km"]
             * fleet_df["index_carbon_reduction"]
             * fleet_df["chainage"]
-            * fleet_df["biocorrection"]
             * fleet_df["ghg_factor"]
         )
 
@@ -335,7 +306,7 @@ class Model:
         # Calculate indirect emissions through the electricity grid
         fleet_df = (
             fleet_df.groupby(
-                ["fuel", "segment", "zone", "vehicle_type", "cohort", "year", "tally"]
+                ["fuel", "segment", "zone", "vehicle_type", "cohort", "year", "road_type", "tally"]
             )[["tailpipe_gco2", "chainage"]]
             .sum()
             .reset_index()
@@ -350,7 +321,7 @@ class Model:
         fleet_df["grid_gco2"] = fleet_df["kwh_consumption"] * fleet_df["gco2_kwh"]
         fleet_df = (
             fleet_df.groupby(
-                ["fuel", "segment", "zone", "vehicle_type", "cohort", "year", "tally"]
+                ["fuel", "segment", "zone", "vehicle_type", "cohort", "year", "road_type", "tally"]
             )[["tailpipe_gco2", "grid_gco2", "chainage"]]
             .sum()
             .reset_index()
