@@ -7,7 +7,9 @@ from caf.carbon.load_data import REGION_FILTER, OUT_PATH
 class FleetEmissionsModel:
     """Calculate fleet emissions from fleet and demand data."""
 
-    def __init__(self, regions, ev_redistribution, time_period, scenario_list, run_fresh, run_name):
+    def __init__(
+        self, regions, ev_redistribution, time_period, scenario_list, run_fresh, run_name
+    ):
         # %% Load config file
         region_filter = pd.read_csv(REGION_FILTER)
         region_filter = region_filter.drop_duplicates()
@@ -33,7 +35,13 @@ class FleetEmissionsModel:
                 print(i, time)
                 print("###################")
                 scenario = scenario_dependent.Scenario(
-                    region_filter, time_period, time, i, invariant_data, regions, pathway,
+                    region_filter,
+                    time_period,
+                    time,
+                    i,
+                    invariant_data,
+                    regions,
+                    pathway,
                 )
                 model = projection.Model(
                     time,
@@ -42,7 +50,7 @@ class FleetEmissionsModel:
                     invariant_data,
                     scenario,
                     ev_redistribution,
-                    run_name
+                    run_name,
                 )
                 model.allocate_chainage()
                 model.predict_emissions()

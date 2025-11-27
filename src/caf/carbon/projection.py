@@ -12,7 +12,14 @@ class Model:
     """Predict emissions using emissions, demand and projected fleet data."""
 
     def __init__(
-        self, time, time_period, region_filter, invariant_obj, scenario_obj, ev_redistribution, run_name
+        self,
+        time,
+        time_period,
+        region_filter,
+        invariant_obj,
+        scenario_obj,
+        ev_redistribution,
+        run_name,
     ):
         """Initialise functions and set class variables.
 
@@ -219,7 +226,9 @@ class Model:
         )
         chainage["chainage"] = chainage["chainage"] * chainage["cya_prop_of_bt_rt"]
         chainage = (
-            chainage.groupby(["vehicle_type", "cya", "zone", "road_type", "speed_band", "year"])["chainage"]
+            chainage.groupby(
+                ["vehicle_type", "cya", "zone", "road_type", "speed_band", "year"]
+            )["chainage"]
             .sum()
             .reset_index()
         )
@@ -306,7 +315,16 @@ class Model:
         # Calculate indirect emissions through the electricity grid
         fleet_df = (
             fleet_df.groupby(
-                ["fuel", "segment", "zone", "vehicle_type", "cohort", "year", "road_type", "tally"]
+                [
+                    "fuel",
+                    "segment",
+                    "zone",
+                    "vehicle_type",
+                    "cohort",
+                    "year",
+                    "road_type",
+                    "tally",
+                ]
             )[["tailpipe_gco2", "chainage"]]
             .sum()
             .reset_index()
@@ -321,7 +339,16 @@ class Model:
         fleet_df["grid_gco2"] = fleet_df["kwh_consumption"] * fleet_df["gco2_kwh"]
         fleet_df = (
             fleet_df.groupby(
-                ["fuel", "segment", "zone", "vehicle_type", "cohort", "year", "road_type", "tally"]
+                [
+                    "fuel",
+                    "segment",
+                    "zone",
+                    "vehicle_type",
+                    "cohort",
+                    "year",
+                    "road_type",
+                    "tally",
+                ]
             )[["tailpipe_gco2", "grid_gco2", "chainage"]]
             .sum()
             .reset_index()

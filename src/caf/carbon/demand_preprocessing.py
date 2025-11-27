@@ -6,7 +6,7 @@ from load_data import (
     LINK_DATA,
     MSOA_RTM_TRANSLATION,
     LINK_ROAD_TYPES,
-    DEMAND_OUT_PATH
+    DEMAND_OUT_PATH,
 )
 
 
@@ -18,7 +18,9 @@ class Demand:
 
         self.demand_factors = pd.read_csv(DEMAND_FACTORS)
         self.region_filter = pd.read_csv(REGION_FILTER)
-        self.region_filter = self.region_filter[self.region_filter["region"].isin(["West Midlands", "East Midlands"])]
+        self.region_filter = self.region_filter[
+            self.region_filter["region"].isin(["West Midlands", "East Midlands"])
+        ]
         self.demand_data_path = str(DEMAND_DATA)
         self.link_data_path = str(LINK_DATA)
         self.out_path = str(DEMAND_OUT_PATH)
@@ -205,11 +207,17 @@ class Demand:
         """Write out the VKM data"""
         for year in self.available_years:
             car_year_segment = self.car_demand[self.car_demand["year"] == "20" + str(year)]
-            car_year_segment.to_csv(self.out_path + rf"\vkm_by_speed_and_type_20{year}_car.csv")
+            car_year_segment.to_csv(
+                self.out_path + rf"\vkm_by_speed_and_type_20{year}_car.csv"
+            )
             lgv_year_segment = self.lgv_demand[self.lgv_demand["year"] == "20" + str(year)]
-            lgv_year_segment.to_csv(self.out_path + rf"\vkm_by_speed_and_type_20{year}_lgv.csv")
+            lgv_year_segment.to_csv(
+                self.out_path + rf"\vkm_by_speed_and_type_20{year}_lgv.csv"
+            )
             hgv_year_segment = self.hgv_demand[self.hgv_demand["year"] == "20" + str(year)]
-            hgv_year_segment.to_csv(self.out_path + rf"\vkm_by_speed_and_type_20{year}_hgv.csv")
+            hgv_year_segment.to_csv(
+                self.out_path + rf"\vkm_by_speed_and_type_20{year}_hgv.csv"
+            )
 
     def process_demand(self):
         """Reformat demand into the correct format for CAFCarb."""
@@ -220,7 +228,8 @@ class Demand:
             for time in time_period:
                 if year == 19:
                     network_links = pd.read_csv(
-                        self.link_data_path + rf"\link_table_MD2_B19_ass_v049_{time}.csv"
+                        self.link_data_path
+                        + rf"\link_table_MD2_B19_ass_v049_{time}.csv"
                         # rf"\20{year}\link_table_SE_B19_{time}_net_v020.csv"
                     ).rename(columns={"A": "a", "B": "b"})
                 else:

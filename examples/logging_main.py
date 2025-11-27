@@ -27,14 +27,15 @@ def main():
 
     # run the fleet emissions model
     if run_fleet:
-        run_fleet_emissions = fleet_emission_model.FleetEmissionsModel(regions, ev_redistribution, time_period,
-                                                                       scenarios, run_fresh, run_name)
+        run_fleet_emissions = fleet_emission_model.FleetEmissionsModel(
+            regions, ev_redistribution, time_period, scenarios, run_fresh, run_name
+        )
     if run_vkm:
         run_vkm_emissions = vkm_emissions_model.VkmEmissionsModel(regions, scenarios)
 
 
-if __name__ == '__main__':
-    log = logging.getLogger('__main__')
+if __name__ == "__main__":
+    log = logging.getLogger("__main__")
     log.setLevel(logging.DEBUG)
     details = ToolDetails("caf.carbon", "1.0.0")
     with LogHelper(__package__, details, log_file=LOG_PATH):

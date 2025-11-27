@@ -73,11 +73,9 @@ class Imputation:
         if vehicle_type == "car":
             # Use the 25th percentile of mass for each car segment as the bin boundaries.
             mass_quantiles = reduced_fleet_df.groupby("segment")["avg_mass"].quantile(0.25)
-            mass_quantiles = (
-                mass_quantiles  # .drop("unknown")
-                .sort_values(ascending=False)
-                .reset_index(level=0)
-            )
+            mass_quantiles = mass_quantiles.sort_values(  # .drop("unknown")
+                ascending=False
+            ).reset_index(level=0)
             mass_quantiles = mass_quantiles.iloc[::-1]
             mass_labels = mass_quantiles["segment"].tolist()
             mass_quantiles.iloc[0, mass_quantiles.columns.get_loc("avg_mass")] = 0
@@ -202,7 +200,7 @@ class CurveFitting:
         )
         # PHEVs operate in electric mode 50% of the time.
         rw_multiplier.loc[rw_multiplier["fuel_type"] == "phev", "rw_multiplier"] = (
-                rw_multiplier["rw_multiplier"] * 0.5
+            rw_multiplier["rw_multiplier"] * 0.5
         )
         return rw_multiplier
 
@@ -302,37 +300,41 @@ class IndexFleet:
         """Read in the DfT fleet data for cars, vans and HGVs and concetenate."""
         # TODO: add fuel and fleet conversions, complete postcode to msoa translation
         fleet_archive = pd.read_csv(VEHICLE_PATH)
-        fleet_archive = fleet_archive.rename(columns={"Post_Code_Current": "Postcode",
-                                                      "Records": "Tally",
-                                                      "Fuel Type": "Fuel",
-                                                      "Body Type Text": "BodyTypeText",
-                                                      "Vehicle_Type": "VehicleType"})
+        fleet_archive = fleet_archive.rename(
+            columns={
+                "Post_Code_Current": "Postcode",
+                "Records": "Tally",
+                "Fuel Type": "Fuel",
+                "Body Type Text": "BodyTypeText",
+                "Vehicle_Type": "VehicleType",
+            }
+        )
 
-        postcode_to_msoa = pd.read_csv(POSTCODE_MSOA, usecols=["Postcode", "MSOA Code"]
-                                       ).rename(columns={"MSOA Code": "Zone"})
+        postcode_to_msoa = pd.read_csv(
+            POSTCODE_MSOA, usecols=["Postcode", "MSOA Code"]
+        ).rename(columns={"MSOA Code": "Zone"})
         postcode_to_msoa["Postcode"] = postcode_to_msoa["Postcode"].str.replace(" ", "")
         fleet_archive = fleet_archive.merge(postcode_to_msoa, on="Postcode", how="left")
         fleet_archive = fleet_archive.drop(columns=["Postcode", "LSOA11NM", "Gross_Weight"])
-        fleet_archive["Fuel"] = (
-            fleet_archive["Fuel"]
-            .replace(
-                {
-                    "Diesel/ Heavy oil": "diesel",
-                    "Electric": "bev",
-                    "Electric/ Diesel": "diesel",
-                    "Electric/ Petrol": "phev",
-                    "Gas": "diesel",
-                    "Gas/Diesel": "diesel",
-                    "Gas/Petrol": "diesel",
-                    "Petrol": "petrol",
-                }
-            )
+        fleet_archive["Fuel"] = fleet_archive["Fuel"].replace(
+            {
+                "Diesel/ Heavy oil": "diesel",
+                "Electric": "bev",
+                "Electric/ Diesel": "diesel",
+                "Electric/ Petrol": "phev",
+                "Gas": "diesel",
+                "Gas/Diesel": "diesel",
+                "Gas/Petrol": "diesel",
+                "Petrol": "petrol",
+            }
         )
         fleet_archive = fleet_archive[
-            fleet_archive["Fuel"].isin(["diesel", "petrol", "phev", "bev", "hybrid", "hyrdogen", "petrol hybrid"])]
+            fleet_archive["Fuel"].isin(
+                ["diesel", "petrol", "phev", "bev", "hybrid", "hyrdogen", "petrol hybrid"]
+            )
+        ]
         # make sure the other random fuel types are filtered/out replaced
-        fleet_archive = fleet_archive[
-            fleet_archive["VehicleType"].isin(["Car", "Goods"])]
+        fleet_archive = fleet_archive[fleet_archive["VehicleType"].isin(["Car", "Goods"])]
         fleet_archive = fleet_archive.drop(columns=["Keeper", "VehicleType"])
         self.fleet_archive = ut.camel_columns_to_snake(fleet_archive)
 
@@ -347,13 +349,18 @@ class IndexFleet:
         fleet_archive = fleet_archive[fleet_archive["tally"] > 0]
         fleet_archive["fuel"] = fleet_archive["fuel"].str.lower().fillna("diesel")
         fleet_archive = fleet_archive[
-            fleet_archive["fuel"].isin(["diesel", "petrol", "phev", "bev", "hybrid", "hydrogen", "petrol hybrid"])]
+            fleet_archive["fuel"].isin(
+                ["diesel", "petrol", "phev", "bev", "hybrid", "hydrogen", "petrol hybrid"]
+            )
+        ]
         fleet_segmentation = pd.read_csv(DVLA_BODY)
         # fleet_archive = fleet_archive.loc[(
         #                                       fleet_archive["body_type_text"].isin(fleet_segmentation["body_type_text"]))
         #                                   & (fleet_archive["wheelplan_text"].isin(fleet_segmentation["wheelplan_text"]))
         #                                   ].reset_index(drop=True)
-        fleet_archive = fleet_archive.merge(fleet_segmentation, how="left", on=["body_type_text", "wheelplan_text"])
+        fleet_archive = fleet_archive.merge(
+            fleet_segmentation, how="left", on=["body_type_text", "wheelplan_text"]
+        )
         fleet_archive = fleet_archive.drop(columns=["wheelplan_text", "body_type_text"])
         fleet_archive = fleet_archive[~fleet_archive["zone"].isin(["zzDisposal", "zzUnknown"])]
         fleet_archive = fleet_archive[~fleet_archive["fuel"].isin(["other"])]
@@ -387,17 +394,28 @@ class IndexFleet:
                 "zone",
                 "vehicle_type",
                 "segment",
-                "fuel"
+                "fuel",
             ],
-            as_index=False
+            as_index=False,
         ).sum()
         fleet_archive["cya"] = self.fleet_index_year
         fleet_archive["cya"] = fleet_archive["cya"] - fleet_archive["year"]
         fleet_archive["year"] = self.fleet_index_year
 
-        fleet_archive = fleet_archive.groupby(["zone", "fuel", "segment",
-                                               "vehicle_type", "cya", "year",
-                                               "avg_mass", "avg_cc", "avg_co2"], as_index=False).sum()
+        fleet_archive = fleet_archive.groupby(
+            [
+                "zone",
+                "fuel",
+                "segment",
+                "vehicle_type",
+                "cya",
+                "year",
+                "avg_mass",
+                "avg_cc",
+                "avg_co2",
+            ],
+            as_index=False,
+        ).sum()
 
         fleet_archive = ut.cya_group_to_list(fleet_archive)
         # Merge vehicles with identical attributes

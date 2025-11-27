@@ -321,6 +321,7 @@ def interpolate_timeline(table_df, grouping_vars, value_var, melt=True):
     table_df["year"] = table_df["year"].dt.year
     return table_df
 
+
 def new_load_general_table(sheet_name: str) -> pd.DataFrame:
     """Load tables from Excel sheets. Remove the config.txt method and access the sheets into a df directly"""
     config = cf.ConfigParser(interpolation=cf.ExtendedInterpolation())
@@ -331,9 +332,7 @@ def new_load_general_table(sheet_name: str) -> pd.DataFrame:
     else:
         header_row = 0
     file_path = r"D:\caf.carbon-EVCI\CAFCarb\input\general_tables.xlsx"
-    table = pd.read_excel(
-        io=file_path, sheet_name=sheet_name, header=header_row
-    ).dropna()
+    table = pd.read_excel(io=file_path, sheet_name=sheet_name, header=header_row).dropna()
 
     # pylint: enable-all
     # Remove column suffixes (e.g. second 2018 column is called 2018.2)
@@ -361,10 +360,7 @@ def new_load_scenario_tables(scenario: str, table_name: str, suffix) -> pd.DataF
     use_cols = table_ranges[table_name]
     file_path = r"D:\caf.carbon-EVCI\CAFCarb\input\scenario_tables_EVCI"
     table = pd.read_excel(
-        io='{}{}'.format(file_path, suffix),
-        sheet_name=scenario,
-        usecols=use_cols,
-        header=1
+        io="{}{}".format(file_path, suffix), sheet_name=scenario, usecols=use_cols, header=1
     ).dropna()
 
     table = table.rename(columns=lambda x: re.sub(r"\.[0-9]$", "", str(x)))

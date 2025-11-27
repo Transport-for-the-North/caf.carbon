@@ -8,7 +8,14 @@ class Scenario:
     """Load in and preprocess scenario variant tables."""
 
     def __init__(
-        self, region_filter, time_period, time, scenario_name, invariant_obj, regions, pathway="none",
+        self,
+        region_filter,
+        time_period,
+        time,
+        scenario_name,
+        invariant_obj,
+        regions,
+        pathway="none",
     ):
         """Initialise functions and set class variables.
 
@@ -75,8 +82,9 @@ class Scenario:
         self.km_index_reductions = ut.new_load_scenario_tables(
             self.scenario_name, "ChainageReduction", suffix=pathway
         )
-        self.co2_reductions = ut.new_load_scenario_tables(self.scenario_name, "co2Reduction",
-                                                          suffix=pathway)
+        self.co2_reductions = ut.new_load_scenario_tables(
+            self.scenario_name, "co2Reduction", suffix=pathway
+        )
         self.km_index_reductions = ut.new_load_scenario_tables(
             self.scenario_name, "ChainageReduction", suffix=pathway
         )
@@ -336,5 +344,7 @@ class Scenario:
         demand.loc[demand["road_type"] == "motorway", "road_type"] = "Motorway"
         demand.loc[demand["road_type"] == "urban", "road_type"] = "Urban"
         demand.loc[demand["road_type"] == "rural", "road_type"] = "Rural"
-        demand = demand.loc[demand["zone"].isin(self.region_filter["msoa21_id"])].reset_index(drop=True)
+        demand = demand.loc[demand["zone"].isin(self.region_filter["msoa21_id"])].reset_index(
+            drop=True
+        )
         return demand
