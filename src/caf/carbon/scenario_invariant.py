@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 from caf.carbon import utility as ut
 
+
 # %% Helper Classes
 class Imputation:
     """Impute missing values in the DfT fleet data."""
@@ -59,11 +60,9 @@ class Imputation:
         if vehicle_type == "car":
             # Use the 25th percentile of mass for each car segment as the bin boundaries.
             mass_quantiles = reduced_fleet_df.groupby("segment")["avg_mass"].quantile(0.25)
-            mass_quantiles = (
-                mass_quantiles  # .drop("unknown")
-                .sort_values(ascending=False)
-                .reset_index(level=0)
-            )
+            mass_quantiles = mass_quantiles.sort_values(  # .drop("unknown")
+                ascending=False
+            ).reset_index(level=0)
             mass_quantiles = mass_quantiles.iloc[::-1]
             mass_labels = mass_quantiles["segment"].tolist()
             mass_quantiles.iloc[0, mass_quantiles.columns.get_loc("avg_mass")] = 0
@@ -301,7 +300,9 @@ class IndexFleet:
 
     def __load_fleet(self):
         """Read in the DfT fleet data for cars, vans and HGVs and concatenate."""
-        fleet_archive = pd.read_csv(self.vehicle_path)  # TODO replace with separate functionality of loading data
+        fleet_archive = pd.read_csv(
+            self.vehicle_path
+        )  # TODO replace with separate functionality of loading data
         fleet_archive = fleet_archive.rename(
             columns={
                 "Post_Code_Current": "Postcode",
@@ -309,7 +310,7 @@ class IndexFleet:
                 "Fuel Type": "Fuel",
                 "Body Type Text": "BodyTypeText",
                 "Vehicle_Type": "VehicleType",
-                #"AvgCC": "AvgES",
+                # "AvgCC": "AvgES",
             }
         )
 
@@ -332,10 +333,12 @@ class IndexFleet:
             }
         )
         fleet_archive = fleet_archive[
-            fleet_archive["Fuel"].isin(["diesel", "petrol", "phev", "bev", "hybrid", "hyrdogen", "petrol hybrid"])]
+            fleet_archive["Fuel"].isin(
+                ["diesel", "petrol", "phev", "bev", "hybrid", "hyrdogen", "petrol hybrid"]
+            )
+        ]
         # make sure the other random fuel types are filtered/out replaced
-        fleet_archive = fleet_archive[
-            fleet_archive["VehicleType"].isin(["Car", "Goods"])]
+        fleet_archive = fleet_archive[fleet_archive["VehicleType"].isin(["Car", "Goods"])]
         fleet_archive = fleet_archive.drop(columns=["Keeper", "VehicleType"])
         self.fleet_archive = ut.camel_columns_to_snake(fleet_archive)
 
@@ -350,9 +353,14 @@ class IndexFleet:
         fleet_archive = fleet_archive[fleet_archive["tally"] > 0]
         fleet_archive["fuel"] = fleet_archive["fuel"].str.lower().fillna("diesel")
         fleet_archive = fleet_archive[
-            fleet_archive["fuel"].isin(["diesel", "petrol", "phev", "bev", "hybrid", "hydrogen", "petrol hybrid"])]
+            fleet_archive["fuel"].isin(
+                ["diesel", "petrol", "phev", "bev", "hybrid", "hydrogen", "petrol hybrid"]
+            )
+        ]
         fleet_segmentation = pd.read_csv(self.dvla_body)
-        fleet_archive = fleet_archive.merge(fleet_segmentation, how="left", on=["body_type_text", "wheelplan_text"])
+        fleet_archive = fleet_archive.merge(
+            fleet_segmentation, how="left", on=["body_type_text", "wheelplan_text"]
+        )
         fleet_archive = fleet_archive.drop(columns=["wheelplan_text", "body_type_text"])
         fleet_archive = fleet_archive[~fleet_archive["zone"].isin(["zzDisposal", "zzUnknown"])]
         fleet_archive = fleet_archive[~fleet_archive["fuel"].isin(["other"])]
@@ -386,17 +394,28 @@ class IndexFleet:
                 "zone",
                 "vehicle_type",
                 "segment",
-                "fuel"
+                "fuel",
             ],
-            as_index=False
+            as_index=False,
         ).sum()
         fleet_archive["cya"] = self.fleet_index_year
         fleet_archive["cya"] = fleet_archive["cya"] - fleet_archive["year"]
         fleet_archive["year"] = self.fleet_index_year
 
-        fleet_archive = fleet_archive.groupby(["zone", "fuel", "segment",
-                                               "vehicle_type", "cya", "year",
-                                               "avg_mass", "avg_cc", "avg_co2"], as_index=False).sum()
+        fleet_archive = fleet_archive.groupby(
+            [
+                "zone",
+                "fuel",
+                "segment",
+                "vehicle_type",
+                "cya",
+                "year",
+                "avg_mass",
+                "avg_cc",
+                "avg_co2",
+            ],
+            as_index=False,
+        ).sum()
 
         fleet_archive = ut.cya_group_to_list(fleet_archive)
         # Merge vehicles with identical attributes
@@ -452,7 +471,9 @@ class IndexFleet:
 
         # Reduce and store index fleet data
         fleet_df = fleet_df.drop(columns=["avg_co2", "avg_cc", "avg_mass"])
-        self.fleet = (fleet_df.groupby(ut.all_but(fleet_df, "tally"))["tally"].sum().reset_index())
+        self.fleet = (
+            fleet_df.groupby(ut.all_but(fleet_df, "tally"))["tally"].sum().reset_index()
+        )
 
     # def __map_zones(self):
     #     """Translate fleet data from LAD to MSOA zones.
@@ -574,9 +595,15 @@ class Invariant:
 
     def __import_shared_tables(self, parameters):
         """Import scenario invariant/baseline inputs."""
-        self.real_world_coefficients = ut.new_load_general_table("realWorldAttributes", parameters)
-        self.fuel_characteristics = ut.new_load_general_table("fuelCharacteristics", parameters)
-        self.yearly_co2_reduction = ut.new_load_general_table("newVehicleCarbonReduction", parameters)
+        self.real_world_coefficients = ut.new_load_general_table(
+            "realWorldAttributes", parameters
+        )
+        self.fuel_characteristics = ut.new_load_general_table(
+            "fuelCharacteristics", parameters
+        )
+        self.yearly_co2_reduction = ut.new_load_general_table(
+            "newVehicleCarbonReduction", parameters
+        )
         self.biofuel_reduction = ut.new_load_general_table("fuelComposition", parameters)
         self.ghg_equivalent = ut.new_load_general_table("GHGEquivalent", parameters)
         self.pt_ghg_factor = ut.new_load_general_table("PTGHGEquivalent", parameters)

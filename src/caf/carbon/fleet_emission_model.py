@@ -5,17 +5,16 @@ from caf.carbon import (
     projection,
     scenario_dependent,
     scenario_invariant,
-    scenario_invariant_2018
+    scenario_invariant_2018,
 )
+
 # from caf.carbon.load_data import REGION_FILTER, DEMAND_PATH
 
 
 class FleetEmissionsModel:
     """Calculate fleet emissions from fleet and demand data."""
 
-    def __init__(
-        self, parameters
-    ):
+    def __init__(self, parameters):
 
         # %% Load config file
         region_filter = pd.read_csv(parameters.region_filter)
@@ -36,8 +35,7 @@ class FleetEmissionsModel:
             print(i)
             print("###################")
             scenario = scenario_dependent.Scenario(i, invariant_data, parameters)
-            model = projection.Model(
-                region_filter, invariant_data, scenario, parameters)
+            model = projection.Model(region_filter, invariant_data, scenario, parameters)
             ev_redistribution_fresh = False
             self.years_to_include = parameters.years_to_include
             model.fleet_transform()
@@ -45,14 +43,21 @@ class FleetEmissionsModel:
                 self.first_enumeration = True
                 for time_period in ["TS1", "TS2", "TS3"]:
                     print(f"Running {time_period} {year}")
-                    keystoenum = pd.HDFStore(str(parameters.demand_path) + f"/{scenario.scenario_code}/"
-                                             + f"vkm_by_speed_and_type_{year}_{time_period}_car.h5", mode="r").keys()
+                    keystoenum = pd.HDFStore(
+                        str(parameters.demand_path)
+                        + f"/{scenario.scenario_code}/"
+                        + f"vkm_by_speed_and_type_{year}_{time_period}_car.h5",
+                        mode="r",
+                    ).keys()
                     for demand_key in keystoenum:
                         print(f"Processing demand for key {demand_key}")
-                        demand_data = scenario_dependent.Demand(scenario, parameters, year, time_period, demand_key)
+                        demand_data = scenario_dependent.Demand(
+                            scenario, parameters, year, time_period, demand_key
+                        )
                         print(f"Allocating emissions for key {demand_key}")
-                        model.allocate_emissions(demand_data, year, time_period, self.first_enumeration)
+                        model.allocate_emissions(
+                            demand_data, year, time_period, self.first_enumeration
+                        )
                         if self.first_enumeration:
                             print("enumeration changed")
                             self.first_enumeration = False
-

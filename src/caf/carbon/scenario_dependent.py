@@ -5,6 +5,7 @@ import configparser as cf
 
 class Scenario:
     """Load in and preprocess scenario variant tables."""
+
     def __init__(self, scenario_name, invariant_obj, parameters):
         """Initialise functions and set class variables.
         Parameters
@@ -35,14 +36,16 @@ class Scenario:
             "Just About Managing": "JAM",
             "Prioritised Places": "PP",
             "Digitally Distributed": "DD",
-            "Urban Zero Carbon": "UZC"
+            "Urban Zero Carbon": "UZC",
         }[self.scenario_name]
-        self.scenario_code = {"JAM": "SC01",
-                              "PP": "SC02",
-                              "DD": "SC03",
-                              "UZC": "SC04",
-                              "BAU": "SC05",
-                              "AE": "SC06"}[self.scenario_initials]
+        self.scenario_code = {
+            "JAM": "SC01",
+            "PP": "SC02",
+            "DD": "SC03",
+            "UZC": "SC04",
+            "BAU": "SC05",
+            "AE": "SC06",
+        }[self.scenario_initials]
 
     def __load_scenario(self, parameters):
         pathway = parameters.pathway
@@ -63,7 +66,9 @@ class Scenario:
             self.km_index_reductions = ut.load_scenario_tables(
                 self.scenario_name, "ChainageReduction", parameters, suffix=pathway
             )
-            self.co2_reductions = ut.load_scenario_tables(self.scenario_name, "co2Reduction", suffix=pathway)
+            self.co2_reductions = ut.load_scenario_tables(
+                self.scenario_name, "co2Reduction", suffix=pathway
+            )
             self.km_index_reductions = ut.load_scenario_tables(
                 self.scenario_name, "ChainageReduction", parameters, suffix=pathway
             )
@@ -79,12 +84,13 @@ class Scenario:
             )
             self.co2_reductions = ut.new_load_scenario_tables(
                 self.scenario_name, "co2Reduction", parameters, suffix=pathway
-                                                              )
+            )
             self.km_index_reductions = ut.new_load_scenario_tables(
                 self.scenario_name, "ChainageReduction", parameters, suffix=pathway
             )
-            self.co2_reductions = ut.new_load_scenario_tables(self.scenario_name, "co2Reduction",
-                                                              parameters, suffix=pathway)
+            self.co2_reductions = ut.new_load_scenario_tables(
+                self.scenario_name, "co2Reduction", parameters, suffix=pathway
+            )
             self.km_index_reductions = ut.new_load_scenario_tables(
                 self.scenario_name, "ChainageReduction", parameters, suffix=pathway
             )
@@ -138,7 +144,9 @@ class Scenario:
         self.type_fleet_size_growth["fleet_growth"] = (
             1 + self.type_fleet_size_growth["fleet_growth"]
         )
-        self.type_fleet_size_growth["fleet_growth"] = pd.to_numeric(self.type_fleet_size_growth["fleet_growth"])
+        self.type_fleet_size_growth["fleet_growth"] = pd.to_numeric(
+            self.type_fleet_size_growth["fleet_growth"]
+        )
         self.type_fleet_size_growth["index_fleet_growth"] = (
             self.type_fleet_size_growth.groupby("vehicle_type")["fleet_growth"].cumprod()
         )
@@ -158,6 +166,7 @@ class Scenario:
         # Convert change in proportion of index year to proportion of index year
         self.km_index_reductions["km_reduction"] = 1 + self.km_index_reductions["km_reduction"]
         print(self.km_index_reductions)
+
 
 class Demand:
     """Load in and preprocess scenario variant tables."""
@@ -198,8 +207,11 @@ class Demand:
         path = str(self.demand_path) + f"/{self.scenario_code}/"
         # self.configuration["filePaths"]["DemandFile"]
         # Iterate through all model years loading and appending demand.
-        demand = pd.read_hdf(f"{path}vkm_by_speed_and_type_{self.year}_{self.time_period}_car.h5", self.key,
-                             mode="r")
+        demand = pd.read_hdf(
+            f"{path}vkm_by_speed_and_type_{self.year}_{self.time_period}_car.h5",
+            self.key,
+            mode="r",
+        )
         # Drop extra columns
         car_demand = demand[demand.columns.drop(list(demand.filter(regex="perc_")))]
         return car_demand
@@ -208,8 +220,11 @@ class Demand:
         """Load the hgv demand for a specified scenario."""
         path = str(self.demand_path) + f"/{self.scenario_code}/"
         # Iterate through all model years loading and appending demand.
-        demand = pd.read_hdf(f"{path}vkm_by_speed_and_type_{self.year}_{self.time_period}_hgv.h5", self.key,
-                             mode="r")
+        demand = pd.read_hdf(
+            f"{path}vkm_by_speed_and_type_{self.year}_{self.time_period}_hgv.h5",
+            self.key,
+            mode="r",
+        )
         # Drop extra columns
         hgv_demand = demand[demand.columns.drop(list(demand.filter(regex="perc_")))]
         return hgv_demand
@@ -219,8 +234,11 @@ class Demand:
         path = str(self.demand_path) + f"/{self.scenario_code}/"
 
         # Iterate through all model years loading and appending demand.
-        demand = pd.read_hdf(f"{path}vkm_by_speed_and_type_{self.year}_{self.time_period}_lgv.h5", self.key,
-                             mode="r")
+        demand = pd.read_hdf(
+            f"{path}vkm_by_speed_and_type_{self.year}_{self.time_period}_lgv.h5",
+            self.key,
+            mode="r",
+        )
         lgv_demand = demand[demand.columns.drop(list(demand.filter(regex="perc_")))]
         return lgv_demand
 

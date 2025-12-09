@@ -66,7 +66,9 @@ def new_load_general_table(sheet_name: str, parameters) -> pd.DataFrame:
     return table
 
 
-def new_load_scenario_tables(scenario: str, table_name: str, parameters, suffix) -> pd.DataFrame:
+def new_load_scenario_tables(
+    scenario: str, table_name: str, parameters, suffix
+) -> pd.DataFrame:
     """Load scenario tables from inputs folder"""
     # TODO(JC): - update in future
     table_ranges = {
@@ -85,10 +87,10 @@ def new_load_scenario_tables(scenario: str, table_name: str, parameters, suffix)
     use_cols = table_ranges[table_name]
 
     table = pd.read_excel(
-        io='{}{}'.format(parameters.scenario_table_path, suffix),
+        io="{}{}".format(parameters.scenario_table_path, suffix),
         sheet_name=scenario,
         usecols=use_cols,
-        header=1
+        header=1,
     ).dropna()
 
     table = table.rename(columns=lambda x: re.sub(r"\.[0-9]$", "", str(x)))
@@ -116,10 +118,10 @@ def load_scenario_tables(scenario: str, table_name: str, parameters, suffix) -> 
     use_cols = table_ranges[table_name]
 
     table = pd.read_excel(
-        io='{}{}'.format(parameters.scenario_table_path, suffix),
+        io="{}{}".format(parameters.scenario_table_path, suffix),
         sheet_name=scenario,
         usecols=use_cols,
-        header=1
+        header=1,
     ).dropna()
 
     table = table.rename(columns=lambda x: re.sub(r"\.[0-9]$", "", str(x)))
@@ -382,7 +384,7 @@ def s_curve_value(a, k, x0, x):
     return value
 
 
-def load_table(self, table_name,  parameters, table_type=None, suffix="File"):
+def load_table(self, table_name, parameters, table_type=None, suffix="File"):
     """Load table from an excel sheet containing multiple tables.
 
     Path, sheet and position are loaded from the config.txt settings.

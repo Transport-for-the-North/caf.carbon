@@ -296,11 +296,17 @@ class IndexFleet:
         def read_fleet(vehicle_type):
             """Read in and preprocess DfT fleet data for a given vehicle type."""
             if vehicle_type == "car":
-                table_df = pd.read_csv(f"{self.vehicle_path}/Cars by LAD from 2003 - 200507.csv")
+                table_df = pd.read_csv(
+                    f"{self.vehicle_path}/Cars by LAD from 2003 - 200507.csv"
+                )
             elif vehicle_type == "lgv":
-                table_df = pd.read_csv(f"{self.vehicle_path}/LGVs by LAD from 2003 - 200507.csv")
+                table_df = pd.read_csv(
+                    f"{self.vehicle_path}/LGVs by LAD from 2003 - 200507.csv"
+                )
             else:
-                table_df = pd.read_csv(f"{self.vehicle_path}/Goods by LAD from 2003 - 200507.csv")
+                table_df = pd.read_csv(
+                    f"{self.vehicle_path}/Goods by LAD from 2003 - 200507.csv"
+                )
             table_df["VehicleType"] = vehicle_type
 
             # Rename columns
@@ -547,13 +553,19 @@ class Invariant:
         """Import scenario invariant/baseline inputs."""
         self.real_world_coefficients = ut.load_table(self, "realWorldAttributes", parameters)
         self.fuel_characteristics = ut.load_table(self, "fuelCharacteristics", parameters)
-        self.yearly_co2_reduction = ut.load_table(self, "newVehicleCarbonReduction", parameters)
+        self.yearly_co2_reduction = ut.load_table(
+            self, "newVehicleCarbonReduction", parameters
+        )
         self.biofuel_reduction = ut.load_table(self, "fuelComposition", parameters)
         self.ghg_equivalent = ut.load_table(self, "GHGEquivalent", parameters)
         self.pt_ghg_factor = ut.load_table(self, "PTGHGEquivalent", parameters)
         self.naei_coefficients = ut.load_csv(self, "naei", parameters)
-        self.grid_consumption = ut.load_table(self, "gridConsumption", parameters, table_type="gridCo2")
-        self.grid_intensity = ut.load_table(self, "gridCarbonIntensity", parameters, table_type="gridCo2")
+        self.grid_consumption = ut.load_table(
+            self, "gridConsumption", parameters, table_type="gridCo2"
+        )
+        self.grid_intensity = ut.load_table(
+            self, "gridCarbonIntensity", parameters, table_type="gridCo2"
+        )
 
         self.msoa_area_info = pd.read_csv(self.msoa_area_type)
         self.msoa_area_info = self.msoa_area_info.rename(

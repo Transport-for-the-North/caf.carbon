@@ -1,6 +1,11 @@
 import itertools
 import logging
-from caf.carbon import fleet_emission_model, vkm_emissions_model, carbon_vkms_to_cafcarb, _version
+from caf.carbon import (
+    fleet_emission_model,
+    vkm_emissions_model,
+    carbon_vkms_to_cafcarb,
+    _version,
+)
 import caf.toolkit as ctk
 import pathlib
 import pydantic
@@ -13,7 +18,7 @@ LOG = logging.getLogger(_NAME)
 
 
 class CarbonConfig(ctk.BaseConfig):
-    """ NoCarb Parameters """
+    """NoCarb Parameters"""
 
     run_fleet: bool
     run_vkm: bool
@@ -77,5 +82,5 @@ def main():
             vkm_emissions_model.VKMEmissionsModel(parameters)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

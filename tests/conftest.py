@@ -7,21 +7,27 @@ import os.path
 # fleet_archive data for basic_clean function in scenario_invariant.py
 @pytest.fixture(scope="module")
 def mock_basic_clean():
-    ba_cl_data = pd.read_csv(os.path.join(os.getcwd(), "data_basic_clean/audit/fleet_archive.csv"))
+    ba_cl_data = pd.read_csv(
+        os.path.join(os.getcwd(), "data_basic_clean/audit/fleet_archive.csv")
+    )
     return ba_cl_data
 
 
 # fleet_archive data for advanced_clean function in scenario_invariant.py
 @pytest.fixture(scope="module")
 def mock_advance_clean():
-    ad_cl_data = pd.read_csv(os.path.join(os.getcwd(), "data_advance_clean/audit/fleet_archive.csv"))
+    ad_cl_data = pd.read_csv(
+        os.path.join(os.getcwd(), "data_advance_clean/audit/fleet_archive.csv")
+    )
     return ad_cl_data
 
 
 # index_fleet data for split_tables function in scenario_invariant.py
 @pytest.fixture(scope="module")
 def mock_split_tables():
-    split_data = pd.read_csv(os.path.join(os.getcwd(), "data_split_tables/audit/index_fleet.csv"))
+    split_data = pd.read_csv(
+        os.path.join(os.getcwd(), "data_split_tables/audit/index_fleet.csv")
+    )
     return split_data
 
 
@@ -31,6 +37,7 @@ def mock_split_tables():
 def mock_warp_invariant_obj():
     class Test:
         index_year = 2023
+
     return Test
 
 
@@ -40,7 +47,8 @@ def mock_warp_invariant_obj():
 def mock_load_scenario_obj():
     class Test:
         index_year = 2023
-        scenario_code = 'JAM'
+        scenario_code = "JAM"
+
     return Test
 
 
@@ -50,17 +58,32 @@ def mock_load_scenario_obj():
 @pytest.fixture(scope="module")
 def mock_model_class_invariant_obj():
     class Test:
-        se_curve = pd.read_csv(os.path.join(os.getcwd(), "data_Model(proj)_demand/se_curve.csv"))
+        se_curve = pd.read_csv(
+            os.path.join(os.getcwd(), "data_Model(proj)_demand/se_curve.csv")
+        )
         index_year = 2023
-        scrappage_curve = pd.read_csv(os.path.join(os.getcwd(), "data_Model(proj)_fleet/scrappage_curve.csv"))
-        ghg_equivalent = pd.read_csv(os.path.join(os.getcwd(), "data_Model(proj)_demand/ghg_equivalent.csv"))
-        yearly_co2_reduction = pd.read_csv(os.path.join(os.getcwd(), "data_Model(proj)_demand/yearly_co2_reductions.csv"))
-        grid_intensity = pd.read_csv(os.path.join(os.getcwd(), "data_Model(proj)_demand/grid_intensity.csv"))
-        grid_consumption = pd.read_csv(os.path.join(os.getcwd(), "data_Model(proj)_demand/grid_consumption.csv"))
+        scrappage_curve = pd.read_csv(
+            os.path.join(os.getcwd(), "data_Model(proj)_fleet/scrappage_curve.csv")
+        )
+        ghg_equivalent = pd.read_csv(
+            os.path.join(os.getcwd(), "data_Model(proj)_demand/ghg_equivalent.csv")
+        )
+        yearly_co2_reduction = pd.read_csv(
+            os.path.join(os.getcwd(), "data_Model(proj)_demand/yearly_co2_reductions.csv")
+        )
+        grid_intensity = pd.read_csv(
+            os.path.join(os.getcwd(), "data_Model(proj)_demand/grid_intensity.csv")
+        )
+        grid_consumption = pd.read_csv(
+            os.path.join(os.getcwd(), "data_Model(proj)_demand/grid_consumption.csv")
+        )
         anpr = pd.read_csv(os.path.join(os.getcwd(), "data_assign_chunk/anpr.csv"))
 
         class index_fleet:
-            fleet = pd.read_csv(os.path.join(os.getcwd(), "data_Model(proj)_fleet/index_fleet.csv"))
+            fleet = pd.read_csv(
+                os.path.join(os.getcwd(), "data_Model(proj)_fleet/index_fleet.csv")
+            )
+
     return Test
 
 
@@ -70,13 +93,30 @@ def mock_model_class_invariant_obj():
 @pytest.fixture(scope="module")
 def mock_model_class_scenario_obj():
     class Test:
-        type_fleet_size_growth = pd.read_csv(os.path.join(os.getcwd(), "data_Model(proj)_fleet/fleet_growth.csv"))
-        fuel_share_of_year_seg_sales = pd.read_csv(os.path.join(os.getcwd(), "data_Model(proj)_fleet/fuel_share_of_year_seg_sales.csv"))
-        seg_share_of_year_type_sales = pd.read_csv(os.path.join(os.getcwd(), "data_Model(proj)_fleet/seg_share_of_year_type_sales.csv"))
-        fleet_sales = pd.read_csv(os.path.join(os.getcwd(), "data_Model(proj)_fleet/fleet_sales.csv"))
-        fleet_size = pd.read_csv(os.path.join(os.getcwd(), "data_Model(proj)_fleet/fleet_size.csv"))
-        co2_reductions = pd.read_csv(os.path.join(os.getcwd(), "data_Model(proj)_demand/co2_reductions.csv"))
-        scenario_initials = 'JAM'
+        type_fleet_size_growth = pd.read_csv(
+            os.path.join(os.getcwd(), "data_Model(proj)_fleet/fleet_growth.csv")
+        )
+        fuel_share_of_year_seg_sales = pd.read_csv(
+            os.path.join(
+                os.getcwd(), "data_Model(proj)_fleet/fuel_share_of_year_seg_sales.csv"
+            )
+        )
+        seg_share_of_year_type_sales = pd.read_csv(
+            os.path.join(
+                os.getcwd(), "data_Model(proj)_fleet/seg_share_of_year_type_sales.csv"
+            )
+        )
+        fleet_sales = pd.read_csv(
+            os.path.join(os.getcwd(), "data_Model(proj)_fleet/fleet_sales.csv")
+        )
+        fleet_size = pd.read_csv(
+            os.path.join(os.getcwd(), "data_Model(proj)_fleet/fleet_size.csv")
+        )
+        co2_reductions = pd.read_csv(
+            os.path.join(os.getcwd(), "data_Model(proj)_demand/co2_reductions.csv")
+        )
+        scenario_initials = "JAM"
+
     return Test
 
 
@@ -84,7 +124,7 @@ def mock_model_class_scenario_obj():
 # functions in projection.py as an input of Model class
 @pytest.fixture(scope="module")
 def mock_region_filter():
-    data = {'MSOA11CD': ['E02000001', 'E02000002', 'E02000003', 'E02000004']}
+    data = {"MSOA11CD": ["E02000001", "E02000002", "E02000003", "E02000004"]}
     filters = pd.DataFrame(data=data)
     return filters
 
@@ -113,6 +153,7 @@ def mock_assign_chunk_emissions():
         demand = pd.read_csv(os.path.join(os.getcwd(), "data_assign_chunk/demand.csv"))
         se_curve = pd.read_csv(os.path.join(os.getcwd(), "data_assign_chunk/se_curve.csv"))
         emissions = pd.read_csv(os.path.join(os.getcwd(), "data_assign_chunk/emissions.csv"))
+
     return Test
 
 
@@ -121,12 +162,26 @@ def mock_assign_chunk_emissions():
 @pytest.fixture(scope="module")
 def mock_curvefitting_invariant_obj():
     class Test:
-        real_world_coefficients = pd.read_csv(os.path.join(os.getcwd(), "data_curve_fitting/real_world_coeff.csv"))
-        fuel_characteristics = pd.read_csv(os.path.join(os.getcwd(), "data_curve_fitting/fuel_characteristics.csv"))
-        rw_multiplier = pd.read_csv(os.path.join(os.getcwd(), "data_curve_fitting/rw_multiplier.csv"))
-        naei_coefficients = pd.read_csv(os.path.join(os.getcwd(), "data_curve_fitting/naei_coefficients.csv"))
+        real_world_coefficients = pd.read_csv(
+            os.path.join(os.getcwd(), "data_curve_fitting/real_world_coeff.csv")
+        )
+        fuel_characteristics = pd.read_csv(
+            os.path.join(os.getcwd(), "data_curve_fitting/fuel_characteristics.csv")
+        )
+        rw_multiplier = pd.read_csv(
+            os.path.join(os.getcwd(), "data_curve_fitting/rw_multiplier.csv")
+        )
+        naei_coefficients = pd.read_csv(
+            os.path.join(os.getcwd(), "data_curve_fitting/naei_coefficients.csv")
+        )
         se_curve = pd.read_csv(os.path.join(os.getcwd(), "data_curve_fitting/se_curve.csv"))
+
         class index_fleet:
-            fleet_archive = pd.read_csv(os.path.join(os.getcwd(), "data_curve_fitting/fleet_archive.csv"))
-            characteristics = pd.read_csv(os.path.join(os.getcwd(), "data_curve_fitting/characteristics.csv"))
+            fleet_archive = pd.read_csv(
+                os.path.join(os.getcwd(), "data_curve_fitting/fleet_archive.csv")
+            )
+            characteristics = pd.read_csv(
+                os.path.join(os.getcwd(), "data_curve_fitting/characteristics.csv")
+            )
+
     return Test
