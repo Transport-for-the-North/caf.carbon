@@ -111,6 +111,22 @@ def cya_group_to_list(table_df):
         "09_11": group_to_list_string(9, 11),
         "12_14": group_to_list_string(12, 14),
         "15+": group_to_list_string(15, 20),
+        #6: group_to_list_string(6, 8),
+        #7: group_to_list_string(6, 8),
+        #8: group_to_list_string(6, 8),
+        #9: group_to_list_string(9,11),
+        #10: group_to_list_string(9,11),
+        #11: group_to_list_string(9,11),
+        #12: group_to_list_string(12,14),
+        #13: group_to_list_string(12,14),
+        #14: group_to_list_string(12,14),
+        #15: group_to_list_string(15,20),
+        #16: group_to_list_string(15,20),
+        #17: group_to_list_string(15,20),
+        #18: group_to_list_string(15,20),
+        #19: group_to_list_string(15,20),
+        #20: group_to_list_string(15,20),
+        
     }
     table_df["cya"] = table_df["cya"].replace(recode)
     return table_df
@@ -331,7 +347,7 @@ def new_load_general_table(sheet_name: str) -> pd.DataFrame:
         header_row = 2
     else:
         header_row = 0
-    file_path = r"D:\caf.carbon-EVCI\CAFCarb\input\general_tables.xlsx"
+    file_path = r"D:\NoCarb EVCI\CAFCarb\input\general_tables.xlsx"
     table = pd.read_excel(io=file_path, sheet_name=sheet_name, header=header_row).dropna()
 
     # pylint: enable-all
@@ -358,7 +374,7 @@ def new_load_scenario_tables(scenario: str, table_name: str, suffix) -> pd.DataF
     else:
         suffix = "_" + suffix + ".xlsx"
     use_cols = table_ranges[table_name]
-    file_path = r"D:\caf.carbon-EVCI\CAFCarb\input\scenario_tables_EVCI"
+    file_path = r"D:\NoCarb EVCI\CAFCarb\input\scenario_tables_EVCI"
     table = pd.read_excel(
         io="{}{}".format(file_path, suffix), sheet_name=scenario, usecols=use_cols, header=1
     ).dropna()

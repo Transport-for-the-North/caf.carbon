@@ -1,3 +1,4 @@
+import warnings
 from sklearn import impute
 from sklearn.experimental import enable_iterative_imputer
 
@@ -152,9 +153,9 @@ class CurveFitting:
         # Find the survival rate of each entry which follows an entry with a final year tally
         # Use that survival rate to calculate the entry's final year tally and iterate until all calculated
         for i in range(5):
-            fleet_archive["survival"] = fleet_archive["cohort_tally"] / fleet_archive.groupby(
-                ["cohort", "vehicle_type"]
-            )["final_year_tally"].shift(1)
+            fleet_archive["survival"] = fleet_archive.groupby(
+                ["vehicle_type"]
+            )["final_year_tally"].shift(1) / fleet_archive["cohort_tally"] 
             fleet_archive["survival"] = np.power(
                 fleet_archive["survival"], 1 / fleet_archive["position_in_group"]
             )
@@ -165,6 +166,7 @@ class CurveFitting:
                 fleet_archive["survival"], fleet_archive["years_to_end"]
             )
 
+
         # Take the average of the survival rates across all cohorts
         scrappage_curve = (
             fleet_archive.groupby(["cya", "vehicle_type"])["survival"].mean().reset_index()
@@ -173,6 +175,9 @@ class CurveFitting:
         scrappage_curve["cya"] = scrappage_curve["cya_group"]
         scrappage_curve = scrappage_curve.drop(columns=["cya_group"])
         print("\n\nScrappage Curve Generated")
+        if (scrappage_curve["survival"]>1).any():
+            warnings.warn("Survivals larger than 1")
+            scrappage_curve.loc[scrappage_curve["survival"]>1, "survival"] = 1
         return scrappage_curve
 
     @staticmethod
@@ -326,6 +331,7 @@ class IndexFleet:
                 "Gas/Diesel": "diesel",
                 "Gas/Petrol": "diesel",
                 "Petrol": "petrol",
+                "Keeper": "keeper",
             }
         )
         fleet_archive = fleet_archive[
@@ -335,7 +341,7 @@ class IndexFleet:
         ]
         # make sure the other random fuel types are filtered/out replaced
         fleet_archive = fleet_archive[fleet_archive["VehicleType"].isin(["Car", "Goods"])]
-        fleet_archive = fleet_archive.drop(columns=["Keeper", "VehicleType"])
+        fleet_archive = fleet_archive.drop(columns=[ "VehicleType"])
         self.fleet_archive = ut.camel_columns_to_snake(fleet_archive)
 
     def __basic_clean(self):
@@ -359,7 +365,7 @@ class IndexFleet:
         #                                   & (fleet_archive["wheelplan_text"].isin(fleet_segmentation["wheelplan_text"]))
         #                                   ].reset_index(drop=True)
         fleet_archive = fleet_archive.merge(
-            fleet_segmentation, how="left", on=["body_type_text", "wheelplan_text"]
+            fleet_segmentation, how="left", on=["body_type_text", "wheelplan_text"] 
         )
         fleet_archive = fleet_archive.drop(columns=["wheelplan_text", "body_type_text"])
         fleet_archive = fleet_archive[~fleet_archive["zone"].isin(["zzDisposal", "zzUnknown"])]
@@ -395,6 +401,7 @@ class IndexFleet:
                 "vehicle_type",
                 "segment",
                 "fuel",
+                "keeper"
             ],
             as_index=False,
         ).sum()
@@ -413,10 +420,10 @@ class IndexFleet:
                 "avg_mass",
                 "avg_cc",
                 "avg_co2",
+                "keeper"
             ],
             as_index=False,
         ).sum()
-
         fleet_archive = ut.cya_group_to_list(fleet_archive)
         # Merge vehicles with identical attributes
         self.fleet_archive = (
@@ -448,12 +455,13 @@ class IndexFleet:
         fleet_df = Imputation.fill_with_mean(fleet_df, "avg_mass")
         fleet_df = Imputation.fill_with_mean(fleet_df, "avg_co2")
         fleet_df = Imputation.fill_with_mean(fleet_df, "avg_cc")
-        self.fleet = Imputation.fill_with_mice(fleet_df)
+        self.fleet = fleet_df
+        #self.fleet = Imputation.fill_with_mice(fleet_df)
 
     def __split_tables(self):
         """Split table into fleet only and emission characteristics only."""
         fleet_df = self.fleet.copy()
-        # fleet_df = ut.cya_list_to_column(fleet_df, shared_value="tally")
+        #fleet_df = ut.cya_list_to_column(fleet_df, shared_value="tally")
         fleet_df["cohort"] = fleet_df["year"] - fleet_df["cya"]
         fleet_df = fleet_df.drop(columns="cya")
 

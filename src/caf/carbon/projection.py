@@ -39,6 +39,8 @@ class Model:
         self.date = datetime.today().strftime("%Y_%m_%d")
         self.ev_redistribution = ev_redistribution
         self.region_filter = region_filter
+
+        (self.outpath/self.run_name).mkdir(exist_ok=True)
         self.__predict_fleet_size()
         self.__create_future_fleet()
         self.__predict_sales()
@@ -79,7 +81,7 @@ class Model:
         # Find the zones which purchase each segment (i.e. a cohort exists from the index year)
         future_fleet = fleet_df.loc[fleet_df["cohort"] == self.invariant.index_year]
         future_fleet = future_fleet[
-            ["segment", "zone", "vehicle_type", "cohort"]
+            ["segment", "zone", "vehicle_type", "cohort", "keeper"]
         ].drop_duplicates()
         # Map the fuel-segments to the zones known to buy them
         self.scenario.future_fleet = future_fleet.merge(
@@ -127,7 +129,7 @@ class Model:
 
         future_sales["cohort"] = future_sales["year"]
         self.scenario.fleet_sales = future_sales[
-            ["zone", "segment", "cohort", "fuel", "vehicle_type", "sales_share"]
+            ["zone", "segment", "cohort", "fuel", "vehicle_type", "keeper" ,"sales_share",]
         ]
 
     @staticmethod
@@ -160,7 +162,7 @@ class Model:
             # zone fuel segment sales = zone fuel segment share of type sales * type sales
             new_cohort["tally"] = new_cohort["sales_share"] * new_cohort["deficit"]
             fleet_df = fleet_df.append(
-                new_cohort[["fuel", "segment", "cohort", "zone", "vehicle_type", "tally"]]
+                new_cohort[["fuel", "segment", "cohort", "zone", "vehicle_type", "tally", "keeper"]]
             )
             return fleet_df
 
@@ -172,7 +174,7 @@ class Model:
     def __project_fleet(self):
         """Predict the fleet for each key model year."""
         fleet_df = self.invariant.index_fleet.fleet[
-            ["fuel", "segment", "zone", "tally", "vehicle_type", "cohort"]
+            ["fuel", "segment", "zone", "tally", "vehicle_type", "cohort", "keeper"]
         ]
         fleet_useful_years = fleet_df.copy()
         fleet_useful_years["year"] = fleet_df["cohort"].max()
@@ -241,7 +243,7 @@ class Model:
         # Fuel-segment-cohort share of each zone vehicletype cyagroup
         self.projected_fleet["prop_by_fuel_seg_cohort"] = self.projected_fleet[
             "tally"
-        ] / self.projected_fleet.groupby(["zone", "cya", "vehicle_type", "year"])[
+        ] / self.projected_fleet.groupby(["zone", "cya", "vehicle_type", "year",])[
             "tally"
         ].transform(
             "sum"
