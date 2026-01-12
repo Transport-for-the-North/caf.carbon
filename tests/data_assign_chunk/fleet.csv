@@ -1,0 +1,5 @@
+﻿origin,fuel,segment,vehicle_type,cohort,tally,year,cya,prop_by_fuel_seg_cohort,speed_band,destination,through,user_class,trip_band
+E02000004,bev,n1 class i,lgv,2020,10,2023,3,1,c,E02000001,E02000003,1,2
+E02000001,bev,medium,car,2023,20,2024,1,0.5,a,E02000002,E02000004,1,2
+E02000003,phev,n1 class i,lgv,2023,9.8,2029,06_08,1,d,E02000004,E02000002,1,2
+E02000002,bev,n1 class i,lgv,2020,9.8,2024,4,1,c,E02000003,E02000001,1,2

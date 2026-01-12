@@ -1,850 +1,330 @@
-# Built-Ins
-import dataclasses
-import os
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Sep 11 12:24:08 2024
 
-# Third Party
+@author: Renewed
+"""
 import pandas as pd
+from caf.carbon.load_data import (VKM_MODEL_DEMAND, VKM_DEMAND_OUT_PATH, GRID_EMISSIONS_PROFILES,
+                                  TAIL_PIPE_EMISSIONS_PROFILES, INDEX_FLEET)
 
 
-@dataclasses.dataclass
-class VkmSplits:
-    def __init__(self):
-        self.current_directory = os.getcwd()
-        self.tag_data = os.path.join(
-            self.current_directory, r"CAFCarb\lookup\tag-data-book-v1.21-may-2023-v1.0.xlsm"
-        )
-        self.sheet_name = "A1.3.9"
-        self.skiprows = 24
-        self.car_cols = "B,D:F"
-        self.lgv_cols = "B,G:I"
-        self.hgv_cols = "B,J:K"
+class VKMEmissionsModel:
+    """Calculate fleet emissions from fleet and demand data."""
+    def __init__(self, run_list, run_fresh, regions, scenarios):
+        for scenario in scenarios:
+            self.scenario = scenario
+            print(f"Running for Scenario {scenario}")
+            self.emission_profiles = CreateSimpleProfiles(run_fresh, self.scenario)
+            for year in run_list:
+                for time_period in ["TS1", "TS2", "TS3"]:
+                    print(f"Running {time_period} {year}")
+                    print("This may take some time...")
+                    self.first_enumeration = True
+                    keys_to_enumerate = pd.HDFStore(
+                        f"{VKM_MODEL_DEMAND}/{scenario}/{year}/vkm_by_speed_and_type_{year}_{time_period}_car.h5",
+                        mode="r").keys()
+                    data_count = 0
+                    for demand_key in keys_to_enumerate:
+                        print(f"Processing demand for key {demand_key}", end='\r')
+                        demand_data = Demand(year, time_period, demand_key, self.scenario)
+                        print(f"Allocating emissions for key {demand_key}", end='\r')
+                        AllocateEmissions(demand_data.demand, year, time_period,
+                                          data_count, self.scenario, self.emission_profiles.scenario_profile,
+                                          self.first_enumeration)
+                        data_count = data_count + 1
+                        if self.first_enumeration:
+                            print("Enumeration changed")
+                            self.first_enumeration = False
+                    
 
-    def read_data(self):
-        return (
-            pd.read_excel(
-                self.tag_data,
-                sheet_name=self.sheet_name,
-                skiprows=self.skiprows,
-                usecols=self.car_cols,
-            ),
-            pd.read_excel(
-                self.tag_data,
-                sheet_name=self.sheet_name,
-                skiprows=self.skiprows,
-                usecols=self.lgv_cols,
-            ),
-            pd.read_excel(
-                self.tag_data,
-                sheet_name=self.sheet_name,
-                skiprows=self.skiprows,
-                usecols=self.hgv_cols,
-            ),
-        )
+class CreateSimpleProfiles:
+    """Load in and preprocess scenario variant tables."""
 
+    def __init__(self, run_fresh, scenario):
+        self.run_fresh = run_fresh
+        self.scenario = scenario
+        if self.run_fresh:
+            
+            def linear_interpolation(df1, df2, df1year, df2year, target_year):
+                """ Conduct the Interpolation """
+                df1["year"] = df1year
+                df2["year"] = df2year
+                df1 = df1[["speed_band", "vehicle_type", "total_gco2"]].rename(columns={"total_gco2": "df1_gco2"})
+                df2 = df2[["speed_band", "vehicle_type", "total_gco2"]].rename(columns={"total_gco2": "df2_gco2"})
+                target = df1.merge(df2, how="outer", on=["speed_band", "vehicle_type"])
+              
+                target["total_gco2"] = (df2year - target_year) * target["df1_gco2"]
+                target["total_gco2"] = target["total_gco2"] + (target_year - df1year) * target["df2_gco2"]
+                target["total_gco2"] = -1 * target["total_gco2"] / (df1year - df2year)
+                target["year"] = target_year
+                target = target[["speed_band", "year", "vehicle_type", "total_gco2"]]
+                return target
+            
+            grid_emissions = pd.read_csv(GRID_EMISSIONS_PROFILES)
+            tailpipe_emissions = pd.read_csv(TAIL_PIPE_EMISSIONS_PROFILES)
+            scenario_vkm_splits = pd.read_csv(rf"{VKM_MODEL_DEMAND}\lookup\{self.scenario}_vkm_splits.csv")
+            fleet = pd.read_csv(INDEX_FLEET)
+            fleet = fleet[["cohort", "vehicle_type", "segment", "tally"]].groupby(["cohort", "vehicle_type", "segment"],
+                                                                                  as_index=False).sum()
+            
+            tailpipe_emissions = tailpipe_emissions.dropna()
+            tailpipe_emissions = tailpipe_emissions[tailpipe_emissions["tailpipe_gco2"] < 1000000]
+            grid_emissions = fleet.merge(grid_emissions, how="inner", on=["cohort", "vehicle_type", "segment"])
+            grid_emissions = grid_emissions[grid_emissions["fuel"] == "bev"]
+            grid_emissions["grid_gco2"] = grid_emissions["grid_gco2"] * grid_emissions["tally"]
+            grid_emissions = grid_emissions[["vehicle_type", "year", "tally",
+                                            "grid_gco2"]].groupby(["vehicle_type", "year"], as_index=False).sum()
+            grid_emissions["grid_gco2"] = grid_emissions["grid_gco2"] / grid_emissions["tally"]
+            grid_emissions = grid_emissions[["vehicle_type", "year", "grid_gco2"]]   
+            
+            tailpipe_emissions = tailpipe_emissions.rename(columns={"e_cohort": "year"})
+            tailpipe_emissions = tailpipe_emissions[["fuel", "segment", "year", "speed_band",
+                                                     "vehicle_type", "tailpipe_gco2"]]
+            tailpipe_emissions = tailpipe_emissions[tailpipe_emissions["fuel"].isin(["petrol", "diesel"])]
+            
+            fleet = fleet[["vehicle_type", "segment", "tally"]].groupby(
+                ["vehicle_type", "segment"], as_index=False).sum()
+            tailpipe_emissions = fleet.merge(tailpipe_emissions, how="inner", on=["vehicle_type", "segment"])
+            tailpipe_emissions["tailpipe_gco2"] = tailpipe_emissions["tailpipe_gco2"] * tailpipe_emissions["tally"]
+            tailpipe_emissions = tailpipe_emissions[[
+                "fuel", "vehicle_type", "year", "tally", "speed_band", "tailpipe_gco2"
+            ]].groupby(["fuel", "vehicle_type", "speed_band", "year"], as_index=False).sum()
+            tailpipe_emissions["tailpipe_gco2"] = tailpipe_emissions["tailpipe_gco2"] / tailpipe_emissions["tally"]
+            tailpipe_emissions = tailpipe_emissions[["speed_band", "fuel", "vehicle_type", "year", "tailpipe_gco2"]]
+            diesel_emissions = tailpipe_emissions[tailpipe_emissions["fuel"] == "diesel"]
+            diesel_emissions = diesel_emissions.rename(columns={"tailpipe_gco2": "diesel_gco2"})
+            petrol_emissions = tailpipe_emissions[tailpipe_emissions["fuel"] == "petrol"]
+            petrol_emissions = petrol_emissions.rename(columns={"tailpipe_gco2": "petrol_gco2"})
 
-@dataclasses.dataclass
-class FuelParameters:
-    def __init__(self):
-        current_directory = os.getcwd()
-        self.tag_data = os.path.join(
-            current_directory, r"CAFCarb\lookup\tag-data-book-v1.21-may-2023-v1.0.xlsm"
-        )
-        self.sheet_name = "A1.3.11"
-        self.skiprows = 24
-        self.pet_car_cols = "B,D:G"
-        self.dies_car_cols = "B,H:K"
-        self.elec_car_cols = "B,L:O"
+            scenario_emissions = diesel_emissions.merge(scenario_vkm_splits, how="left", on=["year", "vehicle_type"])
+            scenario_emissions = scenario_emissions.merge(
+                petrol_emissions, how="left", on=["year", "vehicle_type", "speed_band"])
+            scenario_emissions = scenario_emissions.fillna(0)
+            scenario_emissions = scenario_emissions.merge(grid_emissions, how="left",  on=["year", "vehicle_type"])
+            scenario_emissions["total_gco2"] = scenario_emissions["petrol_gco2"] * scenario_emissions["petrol"]
+            scenario_emissions["total_gco2"] = scenario_emissions["total_gco2"] + (
+                    scenario_emissions["diesel_gco2"] * scenario_emissions["diesel"])
+            scenario_emissions["total_gco2"] = scenario_emissions["total_gco2"] + (
+                    scenario_emissions["grid_gco2"] * scenario_emissions["electric"])
+            scenario_emissions = scenario_emissions[["speed_band", "year", "vehicle_type", "total_gco2"]]
 
-        self.pet_lgv_cols = "B,P:S"
-        self.dies_lgv_cols = "B,T:W"
-        self.elec_lgv_cols = "B,X:AA"
+            interpol_data_2019 = linear_interpolation(
+                scenario_emissions[scenario_emissions["year"] == 2018], scenario_emissions[
+                    scenario_emissions["year"] == 2020], 2018, 2020, 2019)
+            scenario_emissions = pd.concat([scenario_emissions, interpol_data_2019])
+            for year in range(2021, 2025):
+                interpol_data = linear_interpolation(
+                    scenario_emissions[scenario_emissions["year"] == 2020], scenario_emissions[
+                        scenario_emissions["year"] == 2025], 2020, 2025, year)
+                scenario_emissions = pd.concat([scenario_emissions, interpol_data])
+            for year in range(2026, 2030):
+                interpol_data = linear_interpolation(
+                    scenario_emissions[scenario_emissions["year"] == 2025], scenario_emissions[
+                        scenario_emissions["year"] == 2030], 2025, 2030, year)
+                scenario_emissions = pd.concat([scenario_emissions, interpol_data])
+            for year in range(2031, 2035):
+                interpol_data = linear_interpolation(
+                    scenario_emissions[scenario_emissions["year"] == 2030], scenario_emissions[
+                        scenario_emissions["year"] == 2035], 2030, 2035, year)
+                scenario_emissions = pd.concat([scenario_emissions, interpol_data])
+            for year in range(2036, 2040):
+                interpol_data = linear_interpolation(
+                    scenario_emissions[scenario_emissions["year"] == 2035], scenario_emissions[
+                        scenario_emissions["year"] == 2040], 2035, 2040, year)
+                scenario_emissions = pd.concat([scenario_emissions, interpol_data])
+            for year in range(2041, 2045):
+                interpol_data = linear_interpolation(
+                    scenario_emissions[scenario_emissions["year"] == 2040], scenario_emissions[
+                        scenario_emissions["year"] == 2045], 2040, 2045, year)
+                scenario_emissions = pd.concat([scenario_emissions, interpol_data])
+            for year in range(2046, 2050):
+                interpol_data = linear_interpolation(
+                    scenario_emissions[scenario_emissions["year"] == 2045],
+                    scenario_emissions[scenario_emissions["year"] == 2050], 2045, 2050, year)
+                scenario_emissions = pd.concat([scenario_emissions, interpol_data])
+            scenario_co2_reductions = pd.read_csv(
+                rf"{VKM_MODEL_DEMAND}\lookup\{self.scenario}_co2_management.csv")
+            scenario_co2_reductions["reduction"] = (1 - scenario_co2_reductions["reduction"])
+            scenario_emissions = scenario_emissions.merge(scenario_co2_reductions, how="left",
+                                                          on=["year", "vehicle_type"])
+            scenario_emissions["total_gco2"] = scenario_emissions["reduction"] * scenario_emissions["total_gco2"]
+            scenario_emissions = scenario_emissions.drop(columns=["reduction"])
 
-        self.dies_ogv1_col = "B,AB:AE"
-        self.dies_ogv2_col = "B,AF:AI"
+            self.scenario_profile = scenario_emissions
+            self.scenario_profile.to_csv(
+                rf"{VKM_MODEL_DEMAND}\
+                input\{self.scenario}_emissions_profiles.csv", index=False)
+        else:
+            self.scenario_profile = pd.read_csv(
+                rf"{VKM_MODEL_DEMAND}\input\{self.scenario}_emissions_profiles.csv")
+            
 
-    def read_data(self):
-        return (
-            pd.read_excel(
-                self.tag_data,
-                sheet_name=self.sheet_name,
-                skiprows=self.skiprows,
-                usecols=self.pet_car_cols,
-            ),
-            pd.read_excel(
-                self.tag_data,
-                sheet_name=self.sheet_name,
-                skiprows=self.skiprows,
-                usecols=self.dies_car_cols,
-            ),
-            pd.read_excel(
-                self.tag_data,
-                sheet_name=self.sheet_name,
-                skiprows=self.skiprows,
-                usecols=self.elec_car_cols,
-            ),
-            pd.read_excel(
-                self.tag_data,
-                sheet_name=self.sheet_name,
-                skiprows=self.skiprows,
-                usecols=self.pet_lgv_cols,
-            ),
-            pd.read_excel(
-                self.tag_data,
-                sheet_name=self.sheet_name,
-                skiprows=self.skiprows,
-                usecols=self.dies_lgv_cols,
-            ),
-            pd.read_excel(
-                self.tag_data,
-                sheet_name=self.sheet_name,
-                skiprows=self.skiprows,
-                usecols=self.elec_lgv_cols,
-            ),
-            pd.read_excel(
-                self.tag_data,
-                sheet_name=self.sheet_name,
-                skiprows=self.skiprows,
-                usecols=self.dies_ogv1_col,
-            ),
-            pd.read_excel(
-                self.tag_data,
-                sheet_name=self.sheet_name,
-                skiprows=self.skiprows,
-                usecols=self.dies_ogv2_col,
-            ),
-        )
+class AllocateEmissions:
+    """Load in and preprocess scenario variant tables."""
 
+    def __init__(self, demand, year, time_period, key, scenario, scenario_profile, first_enumeration):
+        self.year = year
+        self.scenario = scenario
+        self.scenario_profile = scenario_profile
+        self.first_enumeration = first_enumeration
+        self.time_period = time_period
+        self.key = f"{self.time_period}_{self.year}_{key}"
+        self.out_path = VKM_DEMAND_OUT_PATH
+        self.demand = demand
+        self.__assign_emissions()
 
-@dataclasses.dataclass
-class CarbonPerLiter:
-    def __init__(self):
-        current_directory = os.getcwd()
-        self.tag_data = os.path.join(
-            current_directory, r"CAFCarb\lookup\tag-data-book-v1.21-may-2023-v1.0.xlsm"
-        )
-        self.sheet_name = "A3.3"
-        self.skiprows = 25
-        self.pet_cols = "B,D"
-        self.dies_cols = "B,E"
-        self.elec_cols = "B,G"
+    def __assign_emissions(self):
+        print("Creating emissions", end='\r')
+        scenario_vkm_reductions = pd.read_csv(
+            rf"{VKM_MODEL_DEMAND}\lookup\{self.scenario}_vkm_management.csv")
+        scenario_vkm_reductions["reduction"] = (1 - scenario_vkm_reductions["reduction"])
 
-    def read_data(self):
-        return (
-            pd.read_excel(
-                self.tag_data,
-                sheet_name=self.sheet_name,
-                skiprows=self.skiprows,
-                usecols=self.pet_cols,
-            ),
-            pd.read_excel(
-                self.tag_data,
-                sheet_name=self.sheet_name,
-                skiprows=self.skiprows,
-                usecols=self.dies_cols,
-            ),
-            pd.read_excel(
-                self.tag_data,
-                sheet_name=self.sheet_name,
-                skiprows=self.skiprows,
-                usecols=self.elec_cols,
-            ),
-        )
+        scenario_emissions_data = self.demand.merge(scenario_vkm_reductions, how="left", on=["year", "vehicle_type"])
+        scenario_emissions_data["vkm"] = scenario_emissions_data["reduction"] * scenario_emissions_data["vkm"]
+        scenario_emissions_data = scenario_emissions_data.drop(columns=["reduction"])
+        scenario_emissions_data = scenario_emissions_data.merge(self.scenario_profile,
+                                                                how="left", on=["speed_band", "year", "vehicle_type"])
+        scenario_emissions_data["total_gco2"] = scenario_emissions_data["total_gco2"] * scenario_emissions_data["vkm"]
+        scenario_emissions_data = scenario_emissions_data[[
+            "destination", "through", "origin", "user_class", "trip_band", "vehicle_type", "vkm", "total_gco2"]]
+        scenario_emissions_data = scenario_emissions_data.groupby([
+            "destination", "through", "origin", "vehicle_type", "trip_band", "user_class"], as_index=False).sum()
 
-
-def distance_bands(scenario, year, time, user_class):
-    """
-    Calculate the vkms and create distance bands
-    :param scenario:
-    :param year:
-    :param time:
-    :param user_class:
-    :return:
-    """
-    skim = pd.read_csv(
-        rf"Y:\Carbon\QCR_Assignments\03.Assignments\Skims\Merge\Dist_Trip_Merge_{scenario}_{year}_{time}_{user_class}.csv"
-    )
-    # add in vkm distance bands, calculate vkm as distance * trips,
-    # aggregate by trip type zone distance band sum vkm for each, add year column
-    skim["check"] = skim["Distance"] * skim["Trips"]
-    skim = skim.drop(["check"], axis=1)
-    skim.loc[(skim["Distance"] >= 0) & (skim["Distance"] < 5), "0-5km"] = (
-        skim["Distance"] * skim["Trips"]
-    )
-    skim.loc[(skim["Distance"] >= 5) & (skim["Distance"] < 10), "5-10km"] = (
-        skim["Distance"] * skim["Trips"]
-    )
-    skim.loc[(skim["Distance"] >= 10) & (skim["Distance"] < 30), "10-30km"] = (
-        skim["Distance"] * skim["Trips"]
-    )
-    skim.loc[(skim["Distance"] >= 30) & (skim["Distance"] < 50), "30-50km"] = (
-        skim["Distance"] * skim["Trips"]
-    )
-    skim.loc[(skim["Distance"] >= 50), "50km+"] = skim["Distance"] * skim["Trips"]
-    skim = skim.fillna({"0-5km": 0, "5-10km": 0, "10-30km": 0, "30-50km": 0, "50km+": 0})
-    skim = pd.melt(
-        skim,
-        id_vars=["Origin", "Destination"],
-        var_name="Distance_band",
-        value_vars=["0-5km", "5-10km", "10-30km", "30-50km", "50km+"],
-        value_name="Tot_VKM",
-    )
-    skim = (
-        skim.groupby(["Origin", "Destination", "Distance_band"])["Tot_VKM"].sum().reset_index()
-    )
-    skim = skim.sort_values(["Origin", "Destination", "Distance_band"]).reset_index(drop=True)
-    skim["Year"] = year
-    return skim
-
-
-def car_hb_nhb_splits(skim, user_class, year, time_hb):
-    """
-    aggregate NorMITS HB and NHB volumes for each purpose type in a user class to get total volume, match back onto skim
-    by origin and destination pairs.
-
-    :param skim:
-
-    :return: skim
-    """
-    current_directory = os.getcwd()
-    hb_splits = pd.DataFrame()
-    # select NHB splits by user class and add the matrices
-    if user_class == "UC2":
-        purpose_list = ["p1"]
-    if user_class == "UC1":
-        purpose_list = ["p2"]
-    if user_class == "UC3":
-        purpose_list = ["p3", "p4", "p5", "p6", "p7", "p8"]
-    for p in purpose_list:
-        purpose_to = pd.read_csv(
-            os.path.join(
-                current_directory,
-                f"CAFCarb\input\HB_splits\hb_od_from_yr{year}_{p}_m3_{time_hb}.csv",
+        print("Writing out", end='\r')
+        if self.first_enumeration:
+            scenario_emissions_data.to_hdf(
+                f"{self.out_path}/{self.scenario}_emissions_{self.year}_{self.time_period}.h5",
+                f"{self.key}", mode='w', complevel=1, format="table",
+                index=False,
             )
-        )
-        purpose_to = purpose_to.set_index("Unnamed: 0")
-        purpose_from = pd.read_csv(
-            os.path.join(
-                current_directory,
-                f"CAFCarb\input\\HB_splits\hb_od_to_yr{year}_{p}_m3_{time_hb}.csv",
+            print("First enumerated")
+        else:
+            scenario_emissions_data.to_hdf(
+                f"{self.out_path}/{self.scenario}_emissions_{self.year}_{self.time_period}.h5",
+                f"{self.key}", mode='a', complevel=1, append=True,
+                format="table",
+                index=False,
             )
-        )
-        purpose_from = purpose_from.set_index("Unnamed: 0")
-        hb_splits = hb_splits.add(purpose_to, fill_value=0)
-        hb_splits = hb_splits.add(purpose_from, fill_value=0)
-    hb_splits = hb_splits.reset_index()
-    hb_splits = hb_splits.rename(columns={"Unnamed: 0": "Origin"})
-
-    # NHB
-    nhb_splits = pd.DataFrame()
-    # select NHB splits by user class and add the matrices
-    if user_class == "UC1":
-        purpose_list = ["p12"]
-    if user_class == "UC3":
-        purpose_list = ["p13", "p14", "p15", "p16", "p18"]
-    for p in purpose_list:
-        purpose = pd.read_csv(
-            os.path.join(
-                current_directory,
-                rf"CAFCarb\input\HB_splits\nhb_od_yr{year}_{p}_m3_{time_hb}.csv",
-            )
-        )
-        purpose = purpose.set_index("Unnamed: 0")
-        nhb_splits = nhb_splits.add(purpose, fill_value=0)
-    nhb_splits = nhb_splits.reset_index()
-    nhb_splits = nhb_splits.rename(columns={"Unnamed: 0": "Origin"})
-
-    # get the column names
-    range_zones = range(1, 2271)
-    range_zones = [str(x) for x in range_zones]
-    # change to long format, change destination to numeric
-    hb_splits = pd.melt(
-        hb_splits,
-        id_vars=["Origin"],
-        var_name="Destination",
-        value_vars=range_zones,
-        value_name="HB",
-    )
-    hb_splits["Destination"] = pd.to_numeric(hb_splits["Destination"])
-    nhb_splits = pd.melt(
-        nhb_splits,
-        id_vars=["Origin"],
-        var_name="Destination",
-        value_vars=range_zones,
-        value_name="NHB",
-    )
-    nhb_splits["Destination"] = pd.to_numeric(nhb_splits["Destination"])
-    # match to skim data
-    skim = skim.merge(hb_splits, on=["Origin", "Destination"])
-    skim = skim.merge(nhb_splits, on=["Origin", "Destination"])
-    return skim
 
 
-def car_fuel_consumption(
-    skim, car_vkm_split, pet_car_fuel, dies_car_fuel, elec_car_fuel, user_class, year, time_hb
-):
-    """
-    Apply homebased and non-hombased splits for car, find fuel consumption per (kWh/km) electric and (l/km) petrol and diesel
+class Demand:
+    """Load in and preprocess scenario variant tables."""
 
-    :param skim:
-    :param car_vkm_split:
-    :param pet_car_fuel:
-    :param dies_car_fuel:
-    :param elec_car_fuel:
-    :param user_class:
-    :param year:
-    :param time_hb:
-    :return:
-    """
-    # apply the hb/nhb split function, find the volume ration between the two, melt into long form
-    # user class 2 is completely homebased
-    if (user_class == "UC1") | (user_class == "UC3"):
-        skim = car_hb_nhb_splits(skim, user_class, year, time_hb)
-        skim["HB_ratio"] = skim["HB"] / (skim["HB"] + skim["NHB"])
-        skim["NHB_ratio"] = skim["NHB"] / (skim["HB"] + skim["NHB"])
-        skim = skim.drop(["HB", "NHB"], axis=1).rename(
-            columns={"HB_ratio": "HB", "NHB_ratio": "NHB"}
-        )
-    else:
-        skim["HB"], skim["NHB"] = 1, 0
-    skim = pd.melt(
-        skim,
-        id_vars=["Origin", "Destination", "Distance_band", "Year", "Tot_VKM"],
-        var_name="HB/NHB",
-        value_vars=["HB", "NHB"],
-        value_name="HB/NHB ratio",
-    )
+    def __init__(self, demand_year, time_period, demand_key, scenario):
+        self.year = demand_year
+        self.scenario = scenario
+        self.key = demand_key
+        self.time_period = time_period
+        self.__merge_demand()
 
-    # select A1.3.9 year, combine with skim, multiply vkms by the split, drop calculation rows
-    car_tag_vkm_split_year = car_vkm_split.loc[car_vkm_split["Year"] == year]
-    skim = skim.merge(car_tag_vkm_split_year, on="Year")
-    skim["Petrol"], skim["Diesel"], skim["Electric"] = (
-        skim["Petrol"] * skim["Tot_VKM"] * skim["HB/NHB ratio"],
-        skim["Diesel"] * skim["Tot_VKM"] * skim["HB/NHB ratio"],
-        skim["Electric"] * skim["Tot_VKM"] * skim["HB/NHB ratio"],
-    )
-    skim = pd.melt(
-        skim,
-        id_vars=["Origin", "Destination", "Distance_band", "Year", "HB/NHB"],
-        var_name="Fuel_type",
-        value_vars=["Petrol", "Diesel", "Electric"],
-        value_name="VKM",
-    )
+    def __merge_demand(self):
+        """Concatenate car, van and HGV demand data."""
+        demand = self.__load_demand("car")
+        demand = pd.concat([demand, self.__load_demand("lgv")], ignore_index=True)
+        self.demand = pd.concat([demand, self.__load_demand("hgv")], ignore_index=True)
 
-    # set true mean for each vehicle type add vehicle type and user type
-    skim["Average_speed"] = sum(range(10, 131)) / len(range(10, 131))
-    skim["Vehicle_type"] = "car"
-    skim["User_class"] = user_class
+    def __load_car_demand(self):
+        """Load the car demand for a specified scenario."""
+        demand = pd.read_hdf(f"{VKM_MODEL_DEMAND}/{self.scenario}/{self.year}/"
+                             f"vkm_by_speed_and_type_{self.year}_{self.time_period}_car.h5",
+                             self.key, mode="r")
+        return demand
 
-    # select year of fuel consumption for petrol, diesel and electric, fill empty in electric with 0
-    pet_car_fuel_year = pet_car_fuel.loc[pet_car_fuel["Year"] == year]
-    dies_car_fuel_year = dies_car_fuel.loc[dies_car_fuel["Year"] == year]
-    elec_car_fuel_year = elec_car_fuel.loc[elec_car_fuel["Year"] == year].fillna(0)
+    def __load_hgv_demand(self):
+        """Load the hgv demand for a specified scenario."""
+        hgv_demand = pd.read_hdf(f"{VKM_MODEL_DEMAND}/{self.scenario}/{self.year}/"
+                                 f"vkm_by_speed_and_type_{self.year}_{self.time_period}_hgv.h5", self.key, mode="r")
+        hgv_demand["vkm_70-90_kph"] = hgv_demand["vkm_90-110_kph"] + hgv_demand["vkm_70-90_kph"]
+        hgv_demand["vkm_90-110_kph"] = 0
+        return hgv_demand
 
-    # find fuel consumption (L = a/v + b + c.v + d.v2), zero empty columns as electric (kWh/km) and petrol and diesel (l/km)
-    skim.loc[skim["Fuel_type"] == "Petrol", "fuel consumption (l/km)"] = (
-        (pet_car_fuel_year["a"].loc[pet_car_fuel_year.index[0]] / skim["Average_speed"])
-        + (pet_car_fuel_year["b"].loc[pet_car_fuel_year.index[0]])
-        + (pet_car_fuel_year["c"].loc[pet_car_fuel_year.index[0]] * skim["Average_speed"])
-        + (
-            pet_car_fuel_year["d"].loc[pet_car_fuel_year.index[0]]
-            * (skim["Average_speed"] ** 2)
-        )
-    )
-    skim.loc[skim["Fuel_type"] == "Diesel", "fuel consumption (l/km)"] = (
-        (dies_car_fuel_year["a.1"].loc[dies_car_fuel_year.index[0]] / skim["Average_speed"])
-        + (dies_car_fuel_year["b.1"].loc[dies_car_fuel_year.index[0]])
-        + (dies_car_fuel_year["c.1"].loc[dies_car_fuel_year.index[0]] * skim["Average_speed"])
-        + (
-            dies_car_fuel_year["d.1"].loc[dies_car_fuel_year.index[0]]
-            * (skim["Average_speed"] ** 2)
-        )
-    )
-    skim.loc[skim["Fuel_type"] == "Electric", "fuel consumption (kWh/km)"] = (
-        (elec_car_fuel_year["a.2"].loc[elec_car_fuel_year.index[0]] / skim["Average_speed"])
-        + (elec_car_fuel_year["b.2"].loc[elec_car_fuel_year.index[0]])
-        + (elec_car_fuel_year["c.2"].loc[elec_car_fuel_year.index[0]] * skim["Average_speed"])
-        + (
-            elec_car_fuel_year["d.2"].loc[elec_car_fuel_year.index[0]]
-            * (skim["Average_speed"] ** 2)
-        )
-    )
-    skim = skim.fillna({"fuel consumption (kWh/km)": 0, "fuel consumption (l/km)": 0})
-    return skim
+    def __load_lgv_demand(self):
+        """Load the lgv demand for a specified scenario."""
+        lgv_demand = pd.read_hdf(f"{VKM_MODEL_DEMAND}/{self.scenario}/{self.year}/"
+                                 f"vkm_by_speed_and_type_{self.year}_{self.time_period}_lgv.h5", self.key, mode="r")
+        return lgv_demand
 
+    def __load_demand(self, vehicle_type):
+        """Load in and preprocess demand data for a given vehicle type."""
+        new_cols = [
+            "origin",
+            "destination",
+            "through",
+            "user_class",
+            "10_30",
+            "30_50",
+            "50_70",
+            "70_90",
+            "90_110",
+            "trip_band",
+        ]
+        original_cols = [
+            "origin",
+            "destination",
+            "through",
+            "user_class",
+            "vkm_10-30_kph",
+            "vkm_30-50_kph",
+            "vkm_50-70_kph",
+            "vkm_70-90_kph",
+            "vkm_90-110_kph",
+            "trip_band",
+        ]
+        if vehicle_type == "car":
+            demand = self.__load_car_demand()
+        elif vehicle_type == "hgv":
+            demand = self.__load_hgv_demand()
+        else:
+            demand = self.__load_lgv_demand()
+        demand["vehicle_type"] = vehicle_type
 
-def lgv_fuel_consumption(
-    skim, lgv_vkm_split, pet_lgv_fuel, dies_lgv_fuel, elec_lgv_fuel, user_class, year
-):
-    """
-    Apply homebased and non-hombased splits for lgv, find fuel consumption per (kWh/km) electric and (l/km) petrol and diesel
-
-    :param skim:
-    :param lgv_vkm_split:
-    :param pet_lgv_fuel:
-    :param dies_lgv_fuel:
-    :param elec_lgv_fuel:
-    :param user_class:
-    :param year:
-    :return:
-    """
-    # apply the hb/nhb split function, find the volume ration between the two, melt into long form
-    skim["HB"], skim["NHB"] = 0, 1
-    skim = pd.melt(
-        skim,
-        id_vars=["Origin", "Destination", "Distance_band", "Year", "Tot_VKM"],
-        var_name="HB/NHB",
-        value_vars=["HB", "NHB"],
-        value_name="HB/NHB ratio",
-    )
-
-    # select A1.3.9 year, combine with skim, multiply vkms by the split, drop calculation rows
-    lgv_tag_vkm_split_year = lgv_vkm_split.loc[lgv_vkm_split["Year"] == year]
-    skim = skim.merge(lgv_tag_vkm_split_year, on="Year")
-    skim = skim.rename(
-        columns={"Petrol.1": "Petrol", "Diesel.1": "Diesel", "Electric.1": "Electric"}
-    )
-    skim["Petrol"], skim["Diesel"], skim["Electric"] = (
-        skim["Petrol"] * skim["Tot_VKM"] * skim["HB/NHB ratio"],
-        skim["Diesel"] * skim["Tot_VKM"] * skim["HB/NHB ratio"],
-        skim["Electric"] * skim["Tot_VKM"] * skim["HB/NHB ratio"],
-    )
-    skim = pd.melt(
-        skim,
-        id_vars=["Origin", "Destination", "Distance_band", "Year", "HB/NHB"],
-        var_name="Fuel_type",
-        value_vars=["Petrol", "Diesel", "Electric"],
-        value_name="VKM",
-    )
-
-    # set true mean for each vehicle type add vehicle type and user type Note:lgv - diesel and petrol sperate max speeds
-    skim.loc[skim["Fuel_type"] == "Petrol", "Average_speed"] = sum(range(10, 121)) / len(
-        range(10, 121)
-    )
-    skim.loc[skim["Fuel_type"] == "Electric", "Average_speed"] = sum(range(10, 121)) / len(
-        range(10, 121)
-    )
-    skim.loc[skim["Fuel_type"] == "Diesel", "Average_speed"] = sum(range(10, 111)) / len(
-        range(10, 111)
-    )
-    skim["Vehicle_type"] = "lgv"
-    skim["User_class"] = user_class
-
-    # select year of fuel consumption for petrol, diesel and electric, fill empty in electric with 0
-    pet_lgv_fuel_year = pet_lgv_fuel.loc[pet_lgv_fuel["Year"] == year]
-    dies_lgv_fuel_year = dies_lgv_fuel.loc[dies_lgv_fuel["Year"] == year]
-    elec_lgv_fuel_year = elec_lgv_fuel.loc[elec_lgv_fuel["Year"] == year].fillna(0)
-
-    # find fuel consumption (L = a/v + b + c.v + d.v2), zero empty columns as electric (kWh/km) and petrol and diesel (l/km)
-    skim.loc[skim["Fuel_type"] == "Petrol", "fuel consumption (l/km)"] = (
-        (pet_lgv_fuel_year["a.3"].loc[pet_lgv_fuel_year.index[0]] / skim["Average_speed"])
-        + (pet_lgv_fuel_year["b.3"].loc[pet_lgv_fuel_year.index[0]])
-        + (pet_lgv_fuel_year["c.3"].loc[pet_lgv_fuel_year.index[0]] * skim["Average_speed"])
-        + (
-            pet_lgv_fuel_year["d.3"].loc[pet_lgv_fuel_year.index[0]]
-            * (skim["Average_speed"] ** 2)
-        )
-    )
-    skim.loc[skim["Fuel_type"] == "Diesel", "fuel consumption (l/km)"] = (
-        (dies_lgv_fuel_year["a.4"].loc[dies_lgv_fuel_year.index[0]] / skim["Average_speed"])
-        + (dies_lgv_fuel_year["b.4"].loc[dies_lgv_fuel_year.index[0]])
-        + (dies_lgv_fuel_year["c.4"].loc[dies_lgv_fuel_year.index[0]] * skim["Average_speed"])
-        + (
-            dies_lgv_fuel_year["d.4"].loc[dies_lgv_fuel_year.index[0]]
-            * (skim["Average_speed"] ** 2)
-        )
-    )
-    skim.loc[skim["Fuel_type"] == "Electric", "fuel consumption (kWh/km)"] = (
-        (elec_lgv_fuel_year["a.5"].loc[elec_lgv_fuel_year.index[0]] / skim["Average_speed"])
-        + (elec_lgv_fuel_year["b.5"].loc[elec_lgv_fuel_year.index[0]])
-        + (elec_lgv_fuel_year["c.5"].loc[elec_lgv_fuel_year.index[0]] * skim["Average_speed"])
-        + (
-            elec_lgv_fuel_year["d.5"].loc[elec_lgv_fuel_year.index[0]]
-            * (skim["Average_speed"] ** 2)
-        )
-    )
-    skim = skim.fillna({"fuel consumption (kWh/km)": 0, "fuel consumption (l/km)": 0})
-    return skim
-
-
-def hgv_fuel_consumption(
-    skim,
-    hgv_vkm_split,
-    dies_hgv_ogv1_fuel,
-    dies_hgv_ogv2_fuel,
-    user_class,
-    hgv_ogv1_split,
-    hgv_ogv2_split,
-    year,
-):
-    """
-    Apply homebased and non-hombased splits for hgv, find fuel consumption per (kWh/km) electric and (l/km) petrol and diesel
-    :param skim:
-    :param hgv_vkm_split:
-    :param dies_hgv_ogv1_fuel:
-    :param dies_hgv_ogv2_fuel:
-    :param user_class:
-    :param hgv_ogv1_split:
-    :param hgv_ogv2_split:
-    :return: skim
-    """
-
-    # apply the hb/nhb split function, find the volume ration between the two, melt into long form
-    skim["HB"], skim["NHB"] = 0, 1
-    skim = pd.melt(
-        skim,
-        id_vars=["Origin", "Destination", "Distance_band", "Year", "Tot_VKM"],
-        var_name="HB/NHB",
-        value_vars=["HB", "NHB"],
-        value_name="HB/NHB ratio",
-    )
-
-    # select A1.3.9 year, combine with skim, multiply vkms by the split, drop calculation rows
-    hgv_tag_vkm_split_year = hgv_vkm_split.loc[hgv_vkm_split["Year"] == year]
-    skim = skim.merge(hgv_tag_vkm_split_year, on="Year")
-
-    # drop electric as all hgv assumed to be diesel
-    skim = skim.rename(columns={"Electric.2": "Electric", "Diesel.2": "Diesel"})
-    skim = skim[
-        ["Origin", "Distance_band", "Tot_VKM", "Year", "Diesel", "HB/NHB", "HB/NHB ratio"]
-    ]
-    skim["Diesel"] = skim["Diesel"] * skim["Tot_VKM"] * skim["HB/NHB ratio"]
-    skim = pd.melt(
-        skim,
-        id_vars=["Origin", "Distance_band", "Year", "HB/NHB"],
-        var_name="Fuel_type",
-        value_vars=["Diesel"],
-        value_name="TVKM",
-    )
-
-    # split vkm by ogv1 and ogv2 proportions
-    skim["ogv1"] = hgv_ogv1_split
-    skim["ogv2"] = hgv_ogv2_split
-    skim["ogv1"], skim["ogv2"] = skim["ogv1"] * skim["TVKM"], skim["ogv2"] * skim["TVKM"]
-    skim = pd.melt(
-        skim,
-        id_vars=["Origin", "Distance_band", "Year", "HB/NHB", "Fuel_type"],
-        var_name="Vehicle_type",
-        value_vars=["ogv1", "ogv2"],
-        value_name="VKM",
-    )
-
-    # set true mean for each vehicle type add vehicle type and user type
-    skim["Average_speed"] = sum(range(12, 86)) / len(range(12, 86))
-    skim["User_class"] = user_class
-
-    # select year of fuel consumption for petrol, diesel and electric, fill empty in electric with 0 Note: only diesel for hgv
-    dies_hgv_ogv1_fuel_year = dies_hgv_ogv1_fuel.loc[dies_hgv_ogv1_fuel["Year"] == year]
-    dies_hgv_ogv2_fuel_year = dies_hgv_ogv2_fuel.loc[dies_hgv_ogv2_fuel["Year"] == year]
-    # find fuel consumption (L = a/v + b + c.v + d.v2), zero empty columns as electric (kWh/km) and petrol and diesel (l/km)
-    skim.loc[skim["Vehicle_type"] == "ogv1", "fuel consumption (l/km)"] = (
-        (
-            dies_hgv_ogv1_fuel_year["a.6"].loc[dies_hgv_ogv1_fuel_year.index[0]]
-            / skim["Average_speed"]
-        )
-        + (dies_hgv_ogv1_fuel_year["b.6"].loc[dies_hgv_ogv1_fuel_year.index[0]])
-        + (
-            dies_hgv_ogv1_fuel_year["c.6"].loc[dies_hgv_ogv1_fuel_year.index[0]]
-            * skim["Average_speed"]
-        )
-        + (
-            dies_hgv_ogv1_fuel_year["d.6"].loc[dies_hgv_ogv1_fuel_year.index[0]]
-            * (skim["Average_speed"] ** 2)
-        )
-    )
-    skim.loc[skim["Vehicle_type"] == "ogv2", "fuel consumption (l/km)"] = (
-        (
-            dies_hgv_ogv2_fuel_year["a.7"].loc[dies_hgv_ogv2_fuel_year.index[0]]
-            / skim["Average_speed"]
-        )
-        + (dies_hgv_ogv2_fuel_year["b.7"].loc[dies_hgv_ogv2_fuel_year.index[0]])
-        + (
-            dies_hgv_ogv2_fuel_year["c.7"].loc[dies_hgv_ogv2_fuel_year.index[0]]
-            * skim["Average_speed"]
-        )
-        + (
-            dies_hgv_ogv2_fuel_year["d.7"].loc[dies_hgv_ogv2_fuel_year.index[0]]
-            * (skim["Average_speed"] ** 2)
-        )
-    )
-    skim["fuel consumption (kWh/km)"] = 0
-    skim = skim.fillna({"fuel consumption (l/km)": 0})
-    return skim
-
-
-def calculate_co2_emissions(
-    skim, year, pet_carbon, dies_carbon, elec_carbon, time, combined_year
-):
-    """
-    calculate co2 emissions, combine and save to the year dataframe
-    :param skim:
-    :param year: year of skim
-    :param pet_carbon: tag dataset carbon dioxide emissions per litre of fuel petrol
-    :param dies_carbon: tag dataset carbon dioxide emissions per litre of fuel diesel
-    :param elec_carbon:  tag dataset carbon dioxide emissions per litre of fuel electric
-    :param time: time period of skim
-    :param combined_year:
-    :return: skim concatenated into combined year
-
-    """
-    # select year for carbon dioxide emissions per litre of fuel
-    pet_carbon_year = pet_carbon.loc[pet_carbon["Year"] == year]
-    dies_carbon_year = dies_carbon.loc[dies_carbon["Year"] == year]
-    elec_carbon_year = elec_carbon.loc[elec_carbon["Year"] == year]
-
-    # make carbon dioxide emissions per litre/ kwh equal tag value for given year, make empty rows equal zero
-    skim.loc[skim["Fuel_type"] == "Petrol", "emissions (Kg CO2/l)"] = pet_carbon_year[
-        "Kg CO2e/l"
-    ].loc[pet_carbon_year.index[0]]
-    skim.loc[skim["Fuel_type"] == "Diesel", "emissions (Kg CO2/l)"] = dies_carbon_year[
-        "Kg CO2e/l.1"
-    ].loc[dies_carbon_year.index[0]]
-    skim.loc[skim["Fuel_type"] == "Electric", "emissions (Kg CO2e/kWh)"] = elec_carbon_year[
-        "Kg CO2e/kWh"
-    ].loc[elec_carbon_year.index[0]]
-    skim["emissions (Kg CO2/l)"] = skim["emissions (Kg CO2/l)"].fillna(0)
-    skim["emissions (Kg CO2e/kWh)"] = skim["emissions (Kg CO2e/kWh)"].fillna(0)
-
-    # calculate emissions fuel consumption (l/km) * Fuel_VKM * emissions (Kg CO2/l for non-electric, Kg CO2e/kWh for electric
-    skim.loc[skim["Fuel_type"] == "Electric", "Total C02 emissions (Kg C02)"] = (
-        skim["fuel consumption (kWh/km)"] * skim["VKM"] * skim["emissions (Kg CO2e/kWh)"]
-    )
-    skim.loc[
-        (skim["Fuel_type"] == "Petrol") | (skim["Fuel_type"] == "Diesel"),
-        "Total C02 emissions (Kg C02)",
-    ] = (
-        skim["fuel consumption (l/km)"] * skim["VKM"] * skim["emissions (Kg CO2/l)"]
-    )
-
-    # add time period, select columns, sort, combine and save
-    skim["Time"] = time
-    skim = (
-        skim.groupby(
+        rename_cols = dict(zip(original_cols, new_cols))
+        demand = demand.rename(columns=rename_cols)
+        demand = demand[
             [
-                "Origin",
-                "Distance_band",
-                "Year",
-                "Fuel_type",
-                "HB/NHB",
-                "Vehicle_type",
-                "User_class",
-                "Time",
+                "origin",
+                "destination",
+                "through",
+                "vehicle_type",
+                "user_class",
+                "10_30",
+                "30_50",
+                "50_70",
+                "70_90",
+                "90_110",
+                "trip_band",
             ]
-        )[["VKM", "Total C02 emissions (Kg C02)"]]
-        .sum()
-        .reset_index()
-    )
-    skim = skim[
-        [
-            "Origin",
-            "Distance_band",
-            "Year",
-            "Fuel_type",
-            "HB/NHB",
-            "VKM",
-            "Vehicle_type",
-            "User_class",
-            "Total C02 emissions (Kg C02)",
-            "Time",
         ]
-    ]
-    combined_year = pd.concat([combined_year, skim])
-    return combined_year
-
-
-def lininterpol(df1, df2, year1, year2, targetyear, current_directory, scenario):
-    """
-    Linear interpolation of 2 years to get dataframe for target year
-    :param df1: Skim year of dataframe 1
-    :param df2: Skim year of dataframe 2
-    :param year1: year of dataframe 1
-    :param year2: year of dataframe 2
-    :param targetyear: target year of interpolation
-    :param scenario: travel scenario
-    :return: target year dataframe
-    """
-
-    df1year = year1
-    df2year = year2
-    year = targetyear
-    target = df1.copy()
-    for i in ["VKM", "Total C02 emissions (Kg C02)"]:
-        target[i] = (
-            -1 * ((df2year - year) * df1[i] + (year - df1year) * df2[i]) / (df1year - df2year)
+        demand = pd.melt(
+            demand,
+            id_vars=[
+                "origin",
+                "destination",
+                "through",
+                "vehicle_type",
+                "user_class",
+                "trip_band",
+            ],
+            var_name="speed_band",
+            value_name="vkm",
         )
-    target["Year"] = targetyear
-    target = target[
-        [
-            "Origin",
-            "Destination",
-            "Distance_band",
-            "Year",
-            "Fuel_type",
-            "VKM",
-            "Vehicle_type",
-            "User_class",
-            "Total C02 emissions (Kg C02)",
-            "Time",
-        ]
-    ]
-    target.to_csv(os.path.join(current_directory, f"CAFCarb/outputs/{year}_{scenario}.csv"))
-    return target
+        demand = demand[demand["vkm"] != 0]
+        demand["year"] = self.year
+        if self.time_period == "TS1":
+            demand["vkm"] *= 3
+        elif self.time_period == "TS2":
+            demand["vkm"] *= 6
+        elif self.time_period == "TS3":
+            demand["vkm"] *= 3
+        else:
+            print("Warning: couldn't determine time period")
+        
+        if vehicle_type == "car":
+            demand["vkm"] *= 348*(1 + 0.238)
+        elif vehicle_type == "hgv":
+            demand["vkm"] *= 297*(1 + 0.331) / 2.5
+        else:
+            demand["vkm"] *= 329*(1 + 0.216)
 
-
-def interpolate_to_input(current_directory):
-    """
-    Read created files for each scenario, linear interpolation to get outputs for model input years
-    """
-    # TODO replace with scenarios from logging_main
-    scenarios = ["core", "high", "low"]
-    for scenario in scenarios:
-
-        year_2028 = pd.read_csv(
-            os.path.join(current_directory, f"CAFCarb/outputs/2028_{scenario}.csv")
-        )
-        year_2038 = pd.read_csv(
-            os.path.join(current_directory, f"CAFCarb/outputs/2038_{scenario}.csv")
-        )
-        year_2043 = pd.read_csv(
-            os.path.join(current_directory, f"CAFCarb/outputs/2043_{scenario}.csv")
-        )
-        year_2048 = pd.read_csv(
-            os.path.join(current_directory, f"CAFCarb/outputs/2048_{scenario}.csv")
-        )
-        year_2018 = pd.read_csv(
-            os.path.join(current_directory, f"CAFCarb/outputs/2018_base.csv")
-        )
-
-        years = [2020, 2025]
-        for year in years:
-            interpolation = lininterpol(
-                year_2018, year_2028, 2018, 2028, year, current_directory
-            )
-        years = [2030, 2035]
-        for year in years:
-            interpolation = lininterpol(
-                year_2028, year_2038, 2028, 2038, year, current_directory
-            )
-        years = [2040]
-        for year in years:
-            interpolation = lininterpol(
-                year_2038, year_2043, 2038, 2043, year, current_directory
-            )
-        years = [2045, 2050]
-        for year in years:
-            interpolation = lininterpol(
-                year_2043, year_2048, 2043, 2048, year, current_directory
-            )
-
-
-class VkmEmissionsModel:
-    def __init__(self, regions, scenarios):
-
-        # to choose scenarios to run data from
-        self.scenarios = scenarios
-
-        # to choose regions for the tool to be run in
-        self.regions = regions
-
-        # read in tag data
-        current_directory = os.getcwd()
-
-        vkm = VkmSplits()
-        car_vkm_split, lgv_vkm_split, hgv_vkm_split = vkm.read_data()
-
-        fuel = FuelParameters()
-        (
-            pet_car_fuel,
-            dies_car_fuel,
-            elec_car_fuel,
-            pet_lgv_fuel,
-            dies_lgv_fuel,
-            elec_lgv_fuel,
-            dies_hgv_ogv1_fuel,
-            dies_hgv_ogv2_fuel,
-        ) = fuel.read_data()
-
-        carbon = CarbonPerLiter()
-        pet_carbon, dies_carbon, elec_carbon = carbon.read_data()
-
-        years = [2018, 2028, 2038, 2043, 2048]
-        user_classes = ["UC1", "UC2", "UC3", "UC4", "UC5"]
-        time_periods = ["TS1", "TS2", "TS3"]
-        time_periods_hb = ["TP1", "TP2", "TP3"]
-
-        for year in years:
-            if year == 2018:
-                scenarios = ["base"]
-            else:
-                scenarios = ["core", "high", "low"]
-            for scenario in scenarios:
-                # create an empty data frame for each year.
-                combined_year = pd.DataFrame()
-                for user_class in user_classes:
-                    for time, time_hb in zip(time_periods, time_periods_hb):
-                        skim = distance_bands(scenario, year, time, user_class)
-                        # HGV- proportion of VKM ogv1 and ogv2 for calculation -Note assumed for now to be 50/50
-                        hgv_ogv1_split, hgv_ogv2_split = 0.5, 0.5
-                        if (
-                            (user_class == "UC1")
-                            | (user_class == "UC2")
-                            | (user_class == "UC3")
-                        ):
-                            skim = car_fuel_consumption(
-                                skim,
-                                car_vkm_split,
-                                pet_car_fuel,
-                                dies_car_fuel,
-                                elec_car_fuel,
-                                user_class,
-                                year,
-                                time_hb,
-                            )
-                            print(user_class)
-                        elif user_class == "UC4":
-                            skim = lgv_fuel_consumption(
-                                skim,
-                                lgv_vkm_split,
-                                pet_lgv_fuel,
-                                dies_lgv_fuel,
-                                elec_lgv_fuel,
-                                user_class,
-                                year,
-                            )
-                            print(user_class)
-                        elif user_class == "UC5":
-                            skim = hgv_fuel_consumption(
-                                skim,
-                                hgv_vkm_split,
-                                dies_hgv_ogv1_fuel,
-                                dies_hgv_ogv2_fuel,
-                                user_class,
-                                hgv_ogv1_split,
-                                hgv_ogv2_split,
-                                year,
-                            )
-                            print(user_class)
-                        combined_year = calculate_co2_emissions(
-                            skim,
-                            year,
-                            pet_carbon,
-                            dies_carbon,
-                            elec_carbon,
-                            time,
-                            combined_year,
-                        )
-                combined_year = combined_year.sort_values(
-                    [
-                        "Origin",
-                        "Distance_band",
-                        "Year",
-                        "Fuel_type",
-                        "HB/NHB",
-                        "Vehicle_type",
-                        "User_class",
-                        "Time",
-                    ]
-                ).reset_index(drop=True)
-                combined_year.to_csv(
-                    os.path.join(current_directory, f"CAFCarb/outputs/{year}_{scenario}.csv")
-                )
-        interpolate_to_input(current_directory)
+        return demand

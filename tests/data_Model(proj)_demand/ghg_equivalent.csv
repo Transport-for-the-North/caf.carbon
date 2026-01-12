@@ -1,0 +1,5 @@
+﻿segment,fuel,ghg_factor
+medium,bev,1
+medium,phev,1.1
+n1 class i,bev,1.1
+n1 class i,phev,1.2

@@ -1,0 +1,57 @@
+﻿segment,fuel,year,segment_fuel_sales_distribution
+medium,bev,2023,0.1
+medium,bev,2024,0.125
+medium,bev,2025,0.15
+medium,bev,2026,0.18
+medium,bev,2027,0.21
+medium,bev,2028,0.24
+medium,bev,2029,0.27
+medium,bev,2030,0.3
+medium,bev,2031,0.3
+medium,bev,2032,0.3
+medium,bev,2033,0.3
+medium,bev,2034,0.3
+medium,bev,2035,0.3
+medium,bev,2036,0.3
+medium,bev,2037,0.3
+medium,bev,2038,0.3
+medium,bev,2039,0.3
+medium,bev,2040,0.3
+medium,bev,2041,0.3
+medium,bev,2042,0.3
+medium,bev,2043,0.3
+medium,bev,2044,0.3
+medium,bev,2045,0.3
+medium,bev,2046,0.3
+medium,bev,2047,0.3
+medium,bev,2048,0.3
+medium,bev,2049,0.3
+medium,bev,2050,0.3
+n1 class i,phev,2023,0.1
+n1 class i,phev,2024,0.1
+n1 class i,phev,2025,0.1
+n1 class i,phev,2026,0.12
+n1 class i,phev,2027,0.14
+n1 class i,phev,2028,0.16
+n1 class i,phev,2029,0.18
+n1 class i,phev,2030,0.2
+n1 class i,phev,2031,0.22
+n1 class i,phev,2032,0.24
+n1 class i,phev,2033,0.26
+n1 class i,phev,2034,0.28
+n1 class i,phev,2035,0.3
+n1 class i,phev,2036,0.32
+n1 class i,phev,2037,0.34
+n1 class i,phev,2038,0.36
+n1 class i,phev,2039,0.38
+n1 class i,phev,2040,0.4
+n1 class i,phev,2041,0.4
+n1 class i,phev,2042,0.4
+n1 class i,phev,2043,0.4
+n1 class i,phev,2044,0.4
+n1 class i,phev,2045,0.4
+n1 class i,phev,2046,0.4
+n1 class i,phev,2047,0.4
+n1 class i,phev,2048,0.4
+n1 class i,phev,2049,0.4
+n1 class i,phev,2050,0.4

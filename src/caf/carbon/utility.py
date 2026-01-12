@@ -1,7 +1,15 @@
-import re
+# Built-Ins
 import configparser as cf
+import re
+
+# Third Party
 import pandas as pd
+from pandas import DataFrame
+import math
+
+# Local Imports
 from caf.carbon import audit_tests as at
+from caf.carbon.load_data import GENERAL_TABLES_PATH, SCENARIO_TABLES_PATH, NAEI_PATH
 
 
 # %% Helper functions
@@ -41,34 +49,83 @@ def group_to_list_string(start, end):
     return ",".join(map(str, cya_list))
 
 
-def load_table(self, table_name, table_type=None, suffix="File"):
-    """Load table from an Excel sheet containing multiple tables.
-
-    Path, sheet and position are loaded from the config.txt settings.
-    """
-    config = cf.ConfigParser(interpolation=cf.ExtendedInterpolation())
-    config.read("config_local.txt")
-
-    if table_type is None:
-        table_type = self.type
-        header_row = 1
-    elif table_type == "gridCo2":
+def new_load_general_table(sheet_name: str) -> pd.DataFrame:
+    """Load tables from Excel sheets. Remove the config.txt method and access the sheets into a df directly"""
+    if sheet_name in ["gridConsumption", "gridCarbonIntensity"]:
         header_row = 2
-    if suffix in ["None", ""]:
-        suffix = "File"
-    file_path = config["filePaths"][table_type + suffix]
-    # pylint: disable-all
+    else:
+        header_row = 0
+
     table = pd.read_excel(
-        io=file_path,
-        sheet_name=self.scenario_name,
-        usecols=config["fileStructure"][table_name],
-        header=header_row,
+        io=GENERAL_TABLES_PATH, sheet_name=sheet_name, header=header_row
     ).dropna()
+
     # pylint: enable-all
     # Remove column suffixes (e.g. second 2018 column is called 2018.2)
     table = table.rename(columns=lambda x: re.sub(r"\.[0-9]$", "", str(x)))
     table = camel_columns_to_snake(table)
-    at.describe_table(table_name, table, file_path)
+    return table
+
+
+def new_load_scenario_tables(scenario: str, table_name: str, suffix) -> pd.DataFrame:
+    """Load scenario tables from inputs folder"""
+    # TODO(JC): - update in future
+    table_ranges = {
+        "segSales_propOfTypeYear": "A:H",
+        "fuelSales_propOfSegYear": "J:R",
+        "fleetSize_totOfYear": "T:Z",
+        "ptEmissionReduction": "AB:AH",
+        "co2Reduction": "AJ:AL",
+        "ChainageReduction": "AN:AU",
+    }
+
+    if suffix in ["none", ""]:
+        suffix = ".xlsx"
+    else:
+        suffix = "_" + suffix + ".xlsx"
+    use_cols = table_ranges[table_name]
+
+    table = pd.read_excel(
+        io='{}{}'.format(SCENARIO_TABLES_PATH, suffix),
+        sheet_name=scenario,
+        usecols=use_cols,
+        header=1
+    ).dropna()
+
+    table = table.rename(columns=lambda x: re.sub(r"\.[0-9]$", "", str(x)))
+    table = camel_columns_to_snake(table)
+
+    return table
+
+
+def load_scenario_tables(scenario: str, table_name: str, suffix) -> pd.DataFrame:
+    """Load scenario tables from inputs folder"""
+    # TODO(JC): - update in future
+    table_ranges = {
+        "segSales_propOfTypeYear": "A:I",
+        "fuelSales_propOfSegYear": "K:T",
+        "fleetSize_totOfYear": "V:AC",
+        "ptEmissionReduction": "AE:AL",
+        "co2Reduction": "AN:AP",
+        "ChainageReduction": "AR:AZ",
+    }
+
+    if suffix in ["none", ""]:
+        suffix = ".xlsx"
+    else:
+        suffix = "_" + suffix + ".xlsx"
+    use_cols = table_ranges[table_name]
+
+    table = pd.read_excel(
+        io='{}{}'.format(SCENARIO_TABLES_PATH, suffix),
+        sheet_name=scenario,
+        usecols=use_cols,
+        header=1
+    ).dropna()
+
+    table = table.rename(columns=lambda x: re.sub(r"\.[0-9]$", "", str(x)))
+    table = camel_columns_to_snake(table)
+
     return table
 
 
@@ -77,10 +134,7 @@ def load_csv(self, table_name):
 
     Path is loaded from the config.txt settings.
     """
-    config = cf.ConfigParser(interpolation=cf.ExtendedInterpolation())
-    config.read("config_local.txt")
-
-    file_path = config["filePaths"][table_name + "File"]
+    file_path = NAEI_PATH
     table = pd.read_csv(file_path)
     table = camel_columns_to_snake(table)
     at.describe_table(table_name, table, file_path)
@@ -272,7 +326,7 @@ def determine_from_similar(table_df, shared_qualities, missing_quality, value_to
 
     # Append imputed subset to the original dataframe after removing the missing values
     kn_table_df = table_df.loc[~(table_df[missing_quality] == "unknown")]
-    table_df = kn_table_df.append(unkn_table_df, ignore_index=True)
+    table_df = kn_table_df._append(unkn_table_df, ignore_index=True)
 
     # Check that the value to distribute still sums to the same total as before the imputation
     post_count = table_df[value_to_distribute].sum()
@@ -300,8 +354,15 @@ def interpolate_timeline(table_df, grouping_vars, value_var, melt=True):
         Dataframe with full set of years.
     """
     if melt:
+        if value_var == "segment_sales_distribution":
+            table_df.rename(columns={"Segment": "segment"}, inplace=True)  # Rename column
+        if value_var == "segment_fuel_sales_distribution":
+            table_df.rename(
+                columns={"Segment": "segment", "Fuel": "fuel"}, inplace=True
+            )  # Rename column
+
         table_df = pd.melt(
-            table_df, id_vars=grouping_vars, var_name=["year"], value_name=value_var
+            table_df, id_vars=grouping_vars, var_name="year", value_name=value_var
         )
 
     table_df["year"] = pd.to_datetime(table_df["year"], format="%Y")
@@ -315,3 +376,38 @@ def interpolate_timeline(table_df, grouping_vars, value_var, melt=True):
     )
     table_df["year"] = table_df["year"].dt.year
     return table_df
+
+
+def s_curve_value(a, k, x0, x):
+    value = a / (1 + math.exp(-k * (x - x0)))
+    return value
+
+
+def load_table(self, table_name, table_type=None, suffix="File"):
+    """Load table from an excel sheet containing multiple tables.
+
+    Path, sheet and position are loaded from the config.txt settings.
+    """
+    if table_type is None:
+        table_type = self.type
+        header_row = 1
+    elif table_type == "gridCo2":
+        header_row = 2
+    if suffix in ["None", ""]:
+        suffix = "File"
+    file_path = GENERAL_TABLES_PATH
+    if table_name in ["gridConsumption", "gridCarbonIntensity"]:
+        header_row = 2
+    else:
+        header_row = 0
+
+    table = pd.read_excel(
+        io=GENERAL_TABLES_PATH, sheet_name=table_name, header=header_row
+    ).dropna()
+
+    # Remove column suffixes (eg. second 2018 column is called 2018.2)
+    table = table.rename(columns=lambda x: re.sub("\.[0-9]$", "", str(x)))
+    table = camel_columns_to_snake(table)
+
+    at.describe_table(table_name, table, file_path)
+    return table

@@ -1,0 +1,9 @@
+﻿zone,tally,year,fuel,body_type_text,avg_mass,avg_cc,avg_co2,wheelplan_text
+S02001261,1,2004,diesel,ESTATE,1000,1400,110,2 axle rigid body
+E02002052,1,2004,bev,4 DOOR SALOON,1500,50,100,2 axle rigid body
+E02002627,1,2004,hydrogen,ESTATE,1000,2000,150,2 axle rigid body
+E02002623,1,2004,phev,4 DOOR SALOON,1200,1000,220,2 axle rigid body
+E02002623,1,2004,petrol,CAR DERIVED VAN,0,3000,200,2 axle rigid body
+E02002325,0,2004,bev,ESTATE,2000,1400,140,2 axle rigid body
+E02002325,1,2004,nan,ESTATE,2000,1400,140,2 axle rigid body
+E02002623,1,2004,phev,CAR DERIVED VAN,0,3000,200,2 axle rigid body
