@@ -9,10 +9,10 @@ def main():
     # Which regions is the model being run for?
     # ["North West", "North East", "Yorkshire and The Humber", "East of England"
     #  "East Midlands", "West Midlands", "South East", "South West"]
-    regions = ["North West", "North East", "Yorkshire and The Humber"]
+    regions = ["Transport for the North"]
     # Which travel scenarios to run with? ["Business As Usual Core", "Accelerated EV Core"]
     scenarios = ["Business As Usual Core", "Accelerated EV Core"]
-    run_fresh = True
+    run_fresh = False
     run_name = "TfN"
     # Distribute EVs without income assumptions (False) or with income factors (True)?
     ev_redistribution = False

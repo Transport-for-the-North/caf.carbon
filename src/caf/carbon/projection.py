@@ -1,4 +1,5 @@
 from datetime import datetime
+import itertools
 
 import pandas as pd
 import numpy as np
@@ -40,7 +41,7 @@ class Model:
         self.ev_redistribution = ev_redistribution
         self.region_filter = region_filter
 
-        (self.outpath/self.run_name).mkdir(exist_ok=True)
+        (self.outpath / self.run_name).mkdir(exist_ok=True)
         self.__predict_fleet_size()
         self.__create_future_fleet()
         self.__predict_sales()
@@ -79,18 +80,36 @@ class Model:
             ["segment", "fuel"]
         ].drop_duplicates()
         # Find the zones which purchase each segment (i.e. a cohort exists from the index year)
-        future_fleet = fleet_df.loc[fleet_df["cohort"] == self.invariant.index_year]
-        future_fleet = future_fleet[
-            ["segment", "zone", "vehicle_type", "cohort", "keeper"]
-        ].drop_duplicates()
+        # future_fleet = fleet_df.loc[fleet_df["cohort"] == self.invariant.index_year]
+        # future_fleet = future_fleet[
+        #    ["segment", "zone", "vehicle_type", "cohort", "keeper"]
+        # ].drop_duplicates()
+
+        future_fleet = pd.DataFrame(
+            itertools.product(
+                fleet_df["zone"].unique(),
+                seg_fuel_list["segment"],
+                fleet_df["keeper"].unique(),
+            ),
+            columns=["zone", "segment", "keeper"],
+        )
+        future_fleet["vehicle_type"] = future_fleet["segment"]
+        future_fleet["vehicle_type"] = future_fleet["vehicle_type"].replace(
+            fleet_df[["segment", "vehicle_type"]]
+            .drop_duplicates()
+            .set_index("segment")["vehicle_type"]
+            .to_dict()
+        )
+
+        future_fleet["cohort"] = self.invariant.index_year
         # Map the fuel-segments to the zones known to buy them
         self.scenario.future_fleet = future_fleet.merge(
             seg_fuel_list, how="left", on="segment"
-        )
+        ).drop_duplicates()
 
     def __predict_sales(self):
         """Derive the fuel-segment share of sales in each zone and year."""
-        fleet_df = self.invariant.index_fleet.fleet.copy()
+        fleet_df: pd.DataFrame = self.invariant.index_fleet.fleet.copy()
 
         # Sales in index year = number of vehicles in the index year cohort broken down by segment and zone
         index_sales = fleet_df.loc[fleet_df["cohort"] == fleet_df["cohort"].max()]
@@ -103,10 +122,60 @@ class Model:
         ].transform("sum")
         index_sales = index_sales.drop(columns="tally")
 
+        # calculate keeper split
+
+        keeper_split = (
+            fleet_df.groupby(
+                [
+                    "zone",
+                    "keeper",
+                    "segment",
+                ]
+            )["tally"].sum()
+            / fleet_df.groupby(
+                [
+                    "zone",
+                    "segment",
+                ]
+            )["tally"].sum()
+        )
+        keeper_split.name = "keeper_split"
+
+        index_sales = index_sales.merge(
+            keeper_split.to_frame().reset_index(),
+            on=[
+                "zone",
+                "segment",
+            ],
+            how="outer",
+        )
+        missing_segs = index_sales.loc[
+            index_sales["seg_share"].isna(),
+            [
+                "zone",
+                "segment",
+            ],
+        ]
+        index_sales.loc[
+            index_sales[
+                [
+                    "zone",
+                    "segment",
+                ]
+            ]
+            .isin(missing_segs)
+            .all(axis=1),
+            "keeper_split",
+        ] = 1
+        index_sales = index_sales.fillna(0)
+        index_sales["seg_share"] *= index_sales["keeper_split"]
+
         # Merge future fleet with the index fleet on segment and zone
         # Merge this df with both future sales share tables
-        future_sales = self.scenario.future_fleet.copy()
-        future_sales = future_sales.merge(index_sales, how="left", on=["segment", "zone"])
+        future_sales: pd.DataFrame = self.scenario.future_fleet.copy()
+        future_sales = future_sales.merge(
+            index_sales, how="left", on=["segment", "zone", "keeper"]
+        )
         future_sales = future_sales.merge(
             self.scenario.seg_share_of_year_type_sales, how="left", on=["segment"]
         )
@@ -120,6 +189,28 @@ class Model:
         # e.g. 12% of all LGVs sold in YEAR are petrol n1 class ii sold to zone 7
         # zone fuel segment share of type sales = zone share of segment sales *
         # segment share of type sales * fuel share of segment sales
+        future_sales = future_sales.dropna(
+            subset=[
+                "seg_share",
+                "segment_fuel_sales_distribution",
+                "segment_sales_distribution",
+            ]
+        )
+        future_sales = future_sales[
+            ~(future_sales["seg_share"] == 0)
+            & ~(future_sales["segment_fuel_sales_distribution"] == 0)
+            & ~(future_sales["segment_sales_distribution"] == 0)
+        ]
+
+        check_cols = ["zone", "year", "vehicle_type", "fuel", "keeper"]
+        check = future_sales.groupby(check_cols)["segment_sales_distribution"].sum()
+
+        # future_sales = future_sales.set_index(check_cols + ["segment"])
+        # future_sales["segment_sales_distribution"] = (
+        #    future_sales["segment_sales_distribution"] / check
+        # )
+        # future_sales = future_sales.reset_index()
+
         eqn = "{seg_share}*{segment_sales_distribution}*{segment_fuel_sales_distribution}"
         try:
             future_sales["sales_share"] = future_sales.apply(eqn.format_map, axis=1).map(eval)
@@ -129,7 +220,15 @@ class Model:
 
         future_sales["cohort"] = future_sales["year"]
         self.scenario.fleet_sales = future_sales[
-            ["zone", "segment", "cohort", "fuel", "vehicle_type", "keeper" ,"sales_share",]
+            [
+                "zone",
+                "segment",
+                "cohort",
+                "fuel",
+                "vehicle_type",
+                "keeper",
+                "sales_share",
+            ]
         ]
 
     @staticmethod
@@ -162,7 +261,9 @@ class Model:
             # zone fuel segment sales = zone fuel segment share of type sales * type sales
             new_cohort["tally"] = new_cohort["sales_share"] * new_cohort["deficit"]
             fleet_df = fleet_df.append(
-                new_cohort[["fuel", "segment", "cohort", "zone", "vehicle_type", "tally", "keeper"]]
+                new_cohort[
+                    ["fuel", "segment", "cohort", "zone", "vehicle_type", "tally", "keeper"]
+                ]
             )
             return fleet_df
 
@@ -243,7 +344,14 @@ class Model:
         # Fuel-segment-cohort share of each zone vehicletype cyagroup
         self.projected_fleet["prop_by_fuel_seg_cohort"] = self.projected_fleet[
             "tally"
-        ] / self.projected_fleet.groupby(["zone", "cya", "vehicle_type", "year",])[
+        ] / self.projected_fleet.groupby(
+            [
+                "zone",
+                "cya",
+                "vehicle_type",
+                "year",
+            ]
+        )[
             "tally"
         ].transform(
             "sum"
@@ -322,6 +430,7 @@ class Model:
                     "segment",
                     "zone",
                     "vehicle_type",
+                    "keeper",
                     "cohort",
                     "year",
                     "road_type",
@@ -346,6 +455,7 @@ class Model:
                     "segment",
                     "zone",
                     "vehicle_type",
+                    "keeper",
                     "cohort",
                     "year",
                     "road_type",
