@@ -25,7 +25,7 @@ class Redistribution:
         self.scenario = scenario_obj
         self.projected_fleet = projected_fleet.copy()
         self.date = datetime.today().strftime("%Y_%m_%d")
-        self.__load_redistributed_data()
+        #self.__load_redistributed_data()
         if run_fresh:
             self.__input_weights()
             self.__redistribution_parameters()
@@ -342,6 +342,7 @@ class Redistribution:
                 "zone",
                 "tally",
                 "vehicle_type",
+                "keeper"
                 "cohort",
                 "year",
                 "dir",
